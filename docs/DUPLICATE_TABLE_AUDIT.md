@@ -197,4 +197,45 @@ Drop all 73 `z_archive_*` tables.
 
 ---
 
+## Execution Instructions
+
+### Prerequisites
+
+The `admin_sql_exec()` and `sql_editor_run()` RPC functions are currently broken due to missing audit tables. Run migration `000` first to fix them.
+
+### Step-by-Step
+
+1. **Open the Supabase Dashboard** → SQL Editor
+2. **Run migrations in order:**
+
+| Order | File | Purpose | Risk |
+|-------|------|---------|------|
+| 0 | `000_bootstrap_sql_audit_tables.sql` | Fix broken SQL exec RPCs | None (creates missing tables) |
+| 1 | `001_drop_duplicate_tables_phase1.sql` | Drop 17 empty duplicate tables | None (all 0 rows) |
+| 2 | `002_drop_archive_tables_phase2.sql` | Drop z_archive_ historical tables | Low (historical only) |
+| 3 | `003_consolidate_tables_phase3.sql` | Merge audit_logs_new + leave_policy | Low (7 rows migrated) |
+
+3. **Verify each phase** using the SQL verification queries at the bottom of each migration file.
+4. **After migration 000**, the `admin_sql_exec()` function will be restored — you can use it to run subsequent migrations:
+   ```sql
+   SELECT admin_sql_exec('DROP TABLE IF EXISTS public.ld_borrowers CASCADE');
+   ```
+
+### Rollback
+
+- Phase 1 & 2: No data loss (all dropped tables were empty). Recreate from schema if needed.
+- Phase 3: `audit_logs_new` (2 rows) and `leave_policy` (5 rows) data is migrated into canonical tables before dropping.
+
+### Broken RPC Functions Discovered
+
+| Function | Error | Fix |
+|----------|-------|-----|
+| `admin_sql_exec(p_sql)` | `relation "admin_sql_audit" does not exist` | Run migration `000` |
+| `sql_editor_run(p_sql)` | `relation "sql_editor_audit" does not exist` | Run migration `000` |
+| `cleanup_edge_metrics_retention()` | `relation "edge_metrics_refresh_audit" does not exist` | Separate fix needed |
+| `generate_policy_cleanup_sql()` | `relation "_rls_policy_backup_cleanup" does not exist` | Separate fix needed |
+| `refresh_admin_counts()` | `relation "mv_admin_counts" does not exist` | Separate fix needed |
+
+---
+
 *End of Report*
