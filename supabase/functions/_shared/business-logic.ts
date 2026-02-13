@@ -100,6 +100,8 @@ export function transformClient(b: LoandiskBorrower, externalRef: string) {
 
 // ─── Loan Transformation ─────────────────────────────────────────────
 
+// Valid DB statuses: active, pending, defaulted, completed
+// (closed requires total_paid >= total_due; cancelled/rejected/restructured not allowed)
 const LOAN_STATUS_MAP: Record<string, string> = {
   active: "active",
   open: "active",
@@ -108,16 +110,17 @@ const LOAN_STATUS_MAP: Record<string, string> = {
   pending: "pending",
   approved: "pending",
   processing: "pending",
-  closed: "closed",
-  paid: "closed",
-  fully_paid: "closed",
-  settled: "closed",
+  closed: "completed",
+  paid: "completed",
+  fully_paid: "completed",
+  settled: "completed",
+  completed: "completed",
   written_off: "defaulted",
   default: "defaulted",
   defaulted: "defaulted",
-  rejected: "rejected",
-  cancelled: "cancelled",
-  restructured: "restructured",
+  rejected: "defaulted",
+  cancelled: "defaulted",
+  restructured: "active",
 };
 
 export function mapLoanStatus(raw: string | undefined): string {
@@ -174,6 +177,9 @@ function resolveDaysOverdue(l: LoandiskLoan): number {
  *   start_date, status, approved_by, created_at, loan_number,
  *   officer_id, outstanding_balance, total_paid, days_overdue,
  *   last_payment_date, product_type, disbursed_at, branch
+ *
+ * Note: total_due is a GENERATED column (computed from principal * rate),
+ *       so we never include it in inserts/updates.
  */
 export function transformLoan(l: LoandiskLoan, localBorrowerId: string) {
   return {
@@ -181,7 +187,6 @@ export function transformLoan(l: LoandiskLoan, localBorrowerId: string) {
     amount_principal: resolvePrincipal(l),
     interest_rate: resolveInterestRate(l),
     duration_months: resolveDuration(l),
-    total_due: l.total_due ?? l.total_amount ?? null,
     start_date: l.start_date || l.disbursed_date || l.disbursed_at || null,
     status: mapLoanStatus(l.status),
     approved_by: l.approved_by || null,

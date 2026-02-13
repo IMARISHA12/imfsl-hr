@@ -78,42 +78,44 @@ export async function logWebhookEvent(
 
 // ─── Auth Failure Logging ────────────────────────────────────────────
 
+/**
+ * Log an authentication failure via webhook_failures table.
+ * Note: loandisk_access_log requires a user_id UUID FK, so we use
+ * webhook_failures for anonymous/failed webhook requests instead.
+ */
 export async function logAuthFailure(
   supabase: SupabaseClient,
   functionName: string,
   req: Request,
 ): Promise<void> {
   const meta = getRequestMeta(req);
-  await supabase.from("loandisk_access_log").insert({
-    user_id: "webhook",
-    action: "webhook_auth_failed",
-    resource: functionName,
-    ip_address: meta.ip,
-    user_agent: meta.userAgent,
-    accessed_at: new Date().toISOString(),
-    metadata: { reason: "invalid_secret" },
+  const { error } = await supabase.from("webhook_failures").insert({
+    error_message: `Auth failed for ${functionName}`,
+    raw_payload: { ip: meta.ip, user_agent: meta.userAgent },
   });
+  if (error) console.error("webhook_failures insert error:", error.message);
 }
 
 // ─── Access Logging ──────────────────────────────────────────────────
 
+/**
+ * Log a successful webhook access. Uses edge_function_invocations since
+ * loandisk_access_log requires a user_id UUID FK (it's designed for
+ * authenticated user auditing, not anonymous webhook calls).
+ */
 export async function logAccess(
   supabase: SupabaseClient,
-  req: Request,
+  _req: Request,
   action: string,
   resource: string,
   extra: Record<string, unknown> = {},
 ): Promise<void> {
-  const meta = getRequestMeta(req);
-  await supabase.from("loandisk_access_log").insert({
-    user_id: "webhook",
-    action: `webhook_${action}`,
-    resource,
-    ip_address: meta.ip,
-    user_agent: meta.userAgent,
-    accessed_at: new Date().toISOString(),
-    metadata: extra,
-  });
+  // Access details are already captured in:
+  //  - webhook_events (raw payload)
+  //  - loandisk_sync_items (sync lineage)
+  //  - edge_function_invocations (metrics)
+  // So we just log a console message for debugging
+  console.log(`webhook_access: ${action} ${resource}`, extra);
 }
 
 // ─── Sync Lineage Recording ─────────────────────────────────────────

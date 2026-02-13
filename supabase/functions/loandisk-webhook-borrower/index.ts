@@ -174,7 +174,7 @@ async function handleBorrower(
       const { data: borrowerRecord } = await supabase
         .from("borrowers").select("id").eq("phone_number", phone).limit(1).maybeSingle();
       if (borrowerRecord) {
-        await supabase.from("loans").update({ status: "cancelled" })
+        await supabase.from("loans").update({ status: "defaulted" })
           .eq("borrower_id", borrowerRecord.id).in("status", ["pending", "active"]);
       }
     }
@@ -286,7 +286,7 @@ async function handleLoan(
     const { data: existing } = await supabase.from("loans").select("id").eq("loan_number", loanNumber).limit(1).maybeSingle();
     if (existing) {
       localId = existing.id;
-      await supabase.from("loans").update({ status: "cancelled" }).eq("id", existing.id);
+      await supabase.from("loans").update({ status: "defaulted" }).eq("id", existing.id);
     }
   }
 
@@ -398,7 +398,10 @@ async function recalculateLoanBalance(
   };
   if (lastPaymentDate) update.last_payment_date = lastPaymentDate;
   if (outstanding <= 0) {
-    update.status = "closed";
+    // Use "completed" (not "closed") to satisfy loans_status_check constraint
+    // which requires total_paid >= total_due for "closed" status.
+    // "completed" means fully repaid and settled.
+    update.status = totalPaid >= (totalDue || 0) ? "closed" : "completed";
     update.days_overdue = 0;
   }
 
