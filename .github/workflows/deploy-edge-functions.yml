@@ -1,0 +1,68 @@
+name: Deploy Supabase Edge Functions
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'supabase/functions/**'
+      - 'supabase/config.toml'
+  workflow_dispatch:
+    inputs:
+      function:
+        description: 'Function to deploy (blank = universal handler only)'
+        required: false
+        default: ''
+
+env:
+  SUPABASE_PROJECT_REF: lzyixazjquouicfsfzzu
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Set Edge Function secrets
+        run: |
+          supabase secrets set \
+            "LOANDISK_WEBHOOK_SECRET=${{ secrets.LOANDISK_WEBHOOK_SECRET }}" \
+            "SUPABASE_URL=https://${SUPABASE_PROJECT_REF}.supabase.co" \
+            "SUPABASE_SERVICE_ROLE_KEY=${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" \
+            --project-ref "${SUPABASE_PROJECT_REF}"
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+      - name: Deploy universal webhook handler
+        run: |
+          supabase functions deploy loandisk-webhook-borrower \
+            --project-ref "${SUPABASE_PROJECT_REF}"
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+      - name: Deploy additional functions (if changed)
+        if: github.event_name == 'push' || github.event.inputs.function == 'all'
+        run: |
+          for fn in loandisk-webhook-loan loandisk-webhook-repayment loandisk-batch-sync loandisk-reconcile; do
+            echo "Deploying ${fn}..."
+            supabase functions deploy "${fn}" \
+              --project-ref "${SUPABASE_PROJECT_REF}" || echo "  WARN: ${fn} deploy failed (may not exist yet)"
+          done
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+      - name: Verify deployment
+        run: |
+          FN_URL="https://${SUPABASE_PROJECT_REF}.supabase.co/functions/v1/loandisk-webhook-borrower"
+          CODE=$(curl -s -o /dev/null -w "%{http_code}" -X POST "${FN_URL}" \
+            -H "Content-Type: application/json" -d '{}')
+          if [ "$CODE" = "401" ]; then
+            echo "Function deployed successfully (auth check returns 401)"
+          else
+            echo "WARNING: Unexpected status ${CODE}"
+            exit 1
+          fi
