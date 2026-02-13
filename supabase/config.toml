@@ -1,0 +1,5 @@
+[project]
+id = "lzyixazjquouicfsfzzu"
+
+[functions.loandisk-webhook-borrower]
+verify_jwt = false  # Uses custom x-webhook-secret header instead of JWT
