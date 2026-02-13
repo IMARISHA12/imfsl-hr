@@ -87,13 +87,13 @@ run_test "Borrower: reject wrong secret" \
   '{"event":"borrower.created","data":{"borrower_id":1}}' \
   "401" "wrong"
 
-run_test "Loan: reject no secret" \
-  "${BASE}/loandisk-webhook-loan" \
+run_test "Loan payload: reject no secret" \
+  "${BASE}/loandisk-webhook-borrower" \
   '{"event":"loan.created","data":{"loan_id":1}}' \
   "401" "no"
 
-run_test "Repayment: reject no secret" \
-  "${BASE}/loandisk-webhook-repayment" \
+run_test "Repayment payload: reject no secret" \
+  "${BASE}/loandisk-webhook-borrower" \
   '{"event":"repayment.created","data":{"repayment_id":1}}' \
   "401" "no"
 
@@ -164,7 +164,7 @@ run_test "Re-create borrower for loan test" \
   }'
 
 run_test "Create loan 800001" \
-  "${BASE}/loandisk-webhook-loan" \
+  "${BASE}/loandisk-webhook-borrower" \
   '{
     "event": "loan.created",
     "data": {
@@ -182,7 +182,7 @@ run_test "Create loan 800001" \
   }'
 
 run_test "Update loan 800001 (overdue)" \
-  "${BASE}/loandisk-webhook-loan" \
+  "${BASE}/loandisk-webhook-borrower" \
   '{
     "event": "loan.updated",
     "data": {
@@ -200,7 +200,7 @@ run_test "Update loan 800001 (overdue)" \
   }'
 
 run_test "Cancel loan 800001" \
-  "${BASE}/loandisk-webhook-loan" \
+  "${BASE}/loandisk-webhook-borrower" \
   '{
     "event": "loan.deleted",
     "data": {
@@ -216,7 +216,7 @@ echo ""
 echo "Repayment Webhook:"
 # Re-create loan for repayment test
 run_test "Re-create loan for repayment" \
-  "${BASE}/loandisk-webhook-loan" \
+  "${BASE}/loandisk-webhook-borrower" \
   '{
     "event": "loan.created",
     "data": {
@@ -232,7 +232,7 @@ run_test "Re-create loan for repayment" \
   }'
 
 run_test "Create repayment 700001" \
-  "${BASE}/loandisk-webhook-repayment" \
+  "${BASE}/loandisk-webhook-borrower" \
   '{
     "event": "repayment.created",
     "data": {
@@ -247,7 +247,7 @@ run_test "Create repayment 700001" \
   }'
 
 run_test "Reverse repayment 700001" \
-  "${BASE}/loandisk-webhook-repayment" \
+  "${BASE}/loandisk-webhook-borrower" \
   '{
     "event": "repayment.deleted",
     "data": {
