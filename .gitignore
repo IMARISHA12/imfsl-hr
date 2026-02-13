@@ -5,3 +5,6 @@
 
 # Claude Code MCP local overrides with secrets
 # .mcp.json is safe to commit since it uses env var references
+
+# Supabase CLI temp files
+supabase/.temp/
