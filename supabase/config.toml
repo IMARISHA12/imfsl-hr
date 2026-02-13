@@ -3,3 +3,15 @@ id = "lzyixazjquouicfsfzzu"
 
 [functions.loandisk-webhook-borrower]
 verify_jwt = false  # Uses custom x-webhook-secret header instead of JWT
+
+[functions.loandisk-webhook-loan]
+verify_jwt = false  # Uses custom x-webhook-secret header instead of JWT
+
+[functions.loandisk-webhook-repayment]
+verify_jwt = false  # Uses custom x-webhook-secret header instead of JWT
+
+[functions.loandisk-batch-sync]
+verify_jwt = false  # Authenticated via x-webhook-secret header
+
+[functions.loandisk-reconcile]
+verify_jwt = false  # Authenticated via x-webhook-secret header
