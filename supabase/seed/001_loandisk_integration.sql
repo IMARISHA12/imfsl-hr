@@ -1,8 +1,9 @@
 -- Seed: Default Loandisk integration configuration
 -- Run once to bootstrap the integration record that the webhook Edge Function references.
+-- Already seeded via REST API on 2026-02-13 (id: c4023907-dfa5-4926-b06e-cb4667e49c00)
+-- This SQL is kept as a repeatable reference.
 
 INSERT INTO loandisk_integrations (
-  id,
   integration_name,
   environment,
   base_url,
@@ -15,24 +16,24 @@ INSERT INTO loandisk_integrations (
   sync_customers,
   sync_branches,
   created_at,
-  updated_at,
-  created_by
+  updated_at
 )
-VALUES (
-  gen_random_uuid(),
+SELECT
   'Loandisk Production',
   'production',
   'https://api.loandisk.com',
-  ARRAY[]::text[],          -- No IP restriction initially; tighten once Loandisk IPs are known
+  ARRAY[]::text[],
   true,
   true,
-  60,                       -- Sync every 60 minutes (for scheduled pulls)
+  60,
   true,
   true,
   true,
-  false,                    -- Branch sync disabled by default
+  false,
   now(),
-  now(),
-  'system'
-)
-ON CONFLICT DO NOTHING;
+  now()
+WHERE NOT EXISTS (
+  SELECT 1 FROM loandisk_integrations
+  WHERE integration_name = 'Loandisk Production'
+    AND environment = 'production'
+);

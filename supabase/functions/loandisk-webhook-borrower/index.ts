@@ -10,17 +10,34 @@ import { getServiceClient } from "../_shared/supabase-client.ts";
  * Pipeline:
  *   1. Authenticate via x-webhook-secret header
  *   2. Store raw payload in webhook_events
- *   3. Upsert into raw_borrowers (immutable staging)
- *   4. Transform & upsert into clients (canonical)
+ *   3. Upsert into raw_borrowers (staging — keyed on loandisk_id + branch_id)
+ *   4. Transform & upsert into clients (canonical — keyed on external_reference_id)
  *   5. Record sync lineage in loandisk_sync_runs / loandisk_sync_items
  *   6. Record invocation metrics in edge_function_invocations
+ *
+ * Verified table schemas (2026-02-13):
+ *
+ *   raw_borrowers:
+ *     id(uuid) | loandisk_id(bigint,NOT NULL) | branch_id(bigint,NOT NULL)
+ *     payload(jsonb,NOT NULL) | source(text,default:'backfill')
+ *     fetched_at | created_at | updated_at
+ *     UNIQUE(loandisk_id, branch_id)
+ *
+ *   clients:
+ *     id(uuid) | first_name | middle_name | last_name | phone_number
+ *     nida_number | business_type | business_location | revenue_estimate
+ *     status | external_reference_id | next_of_kin_name | next_of_kin_relationship
+ *     next_of_kin_phone | region | district | street | photo_url
+ *     credit_score(default:50) | risk_level(default:'Medium')
+ *     created_at | updated_at | ...
  */
 
 // ─── Types ───────────────────────────────────────────────────────────
 
 interface LoandiskBorrower {
-  borrower_id?: string;
-  id?: string;
+  borrower_id?: number | string;
+  id?: number | string;
+  branch_id?: number | string;
   first_name?: string;
   last_name?: string;
   middle_name?: string;
@@ -46,8 +63,6 @@ interface LoandiskBorrower {
   next_of_kin_phone?: string;
   photo_url?: string;
   status?: string;
-  created_at?: string;
-  updated_at?: string;
   [key: string]: unknown;
 }
 
@@ -57,7 +72,6 @@ interface WebhookPayload {
   action?: string;
   data?: LoandiskBorrower;
   borrower?: LoandiskBorrower;
-  // Loandisk may send flat payloads (fields at root level)
   [key: string]: unknown;
 }
 
@@ -73,22 +87,27 @@ function resolveEventKey(payload: WebhookPayload): string {
 }
 
 function resolveBorrowerData(payload: WebhookPayload): LoandiskBorrower {
-  // Loandisk may nest data under "data", "borrower", or send flat
   if (payload.data && typeof payload.data === "object") return payload.data;
   if (payload.borrower && typeof payload.borrower === "object")
     return payload.borrower;
-
-  // Fall back: treat root payload as borrower (minus meta fields)
   const { event, event_type, action, ...rest } = payload;
   return rest as LoandiskBorrower;
 }
 
-function resolveExternalId(b: LoandiskBorrower): string | null {
-  return (
-    (b.borrower_id as string) ||
-    (b.id as string) ||
-    null
-  );
+/** Loandisk borrower_id is a bigint. Coerce to number. */
+function resolveLoandiskId(b: LoandiskBorrower): number | null {
+  const raw = b.borrower_id ?? b.id;
+  if (raw == null) return null;
+  const num = Number(raw);
+  return Number.isFinite(num) ? num : null;
+}
+
+/** Branch ID from payload, defaults to 1 if not present. */
+function resolveBranchId(b: LoandiskBorrower): number {
+  const raw = b.branch_id;
+  if (raw == null) return 1;
+  const num = Number(raw);
+  return Number.isFinite(num) ? num : 1;
 }
 
 function buildFullName(b: LoandiskBorrower): string {
@@ -97,12 +116,31 @@ function buildFullName(b: LoandiskBorrower): string {
   return parts.join(" ").trim() || "Unknown";
 }
 
+function splitName(b: LoandiskBorrower): { first: string; middle: string; last: string } {
+  if (b.first_name || b.last_name) {
+    return {
+      first: b.first_name || "Unknown",
+      middle: b.middle_name || "",
+      last: b.last_name || "",
+    };
+  }
+  const full = buildFullName(b);
+  const parts = full.split(/\s+/);
+  if (parts.length >= 3) {
+    return { first: parts[0], middle: parts.slice(1, -1).join(" "), last: parts[parts.length - 1] };
+  }
+  if (parts.length === 2) {
+    return { first: parts[0], middle: "", last: parts[1] };
+  }
+  return { first: parts[0] || "Unknown", middle: "", last: "" };
+}
+
 function resolvePhone(b: LoandiskBorrower): string {
   return (b.phone_number || b.mobile || "").trim();
 }
 
 function resolveNida(b: LoandiskBorrower): string | null {
-  return (b.nida_number || b.national_id || null);
+  return b.nida_number || b.national_id || null;
 }
 
 function mapAction(eventKey: string): string {
@@ -115,7 +153,6 @@ function mapAction(eventKey: string): string {
 // ─── Main Handler ────────────────────────────────────────────────────
 
 Deno.serve(async (req: Request) => {
-  // CORS preflight
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
@@ -123,7 +160,6 @@ Deno.serve(async (req: Request) => {
   const startTime = Date.now();
   const supabase = getServiceClient();
   let eventKey = "borrower.unknown";
-  let errorMessage: string | null = null;
 
   try {
     // ── 1. Authentication ──────────────────────────────────────────
@@ -138,7 +174,6 @@ Deno.serve(async (req: Request) => {
       req.headers.get("authorization")?.replace(/^Bearer\s+/i, "");
 
     if (incomingSecret !== webhookSecret) {
-      // Log failed auth attempt for audit
       await supabase.from("loandisk_access_log").insert({
         user_id: "webhook",
         action: "webhook_auth_failed",
@@ -160,11 +195,14 @@ Deno.serve(async (req: Request) => {
     const payload: WebhookPayload = await req.json();
     eventKey = resolveEventKey(payload);
     const borrower = resolveBorrowerData(payload);
-    const externalId = resolveExternalId(borrower);
+    const loandiskId = resolveLoandiskId(borrower);
 
-    if (!externalId) {
-      throw new Error("Payload missing borrower identifier (borrower_id or id)");
+    if (loandiskId === null) {
+      throw new Error("Payload missing borrower identifier (borrower_id or id must be a number)");
     }
+
+    const branchId = resolveBranchId(borrower);
+    const externalRef = `LD-${loandiskId}`;
 
     // ── 3. Store raw webhook event ─────────────────────────────────
 
@@ -181,48 +219,49 @@ Deno.serve(async (req: Request) => {
       console.error("webhook_events insert error:", webhookErr.message);
     }
 
-    // ── 4. Upsert raw_borrowers (immutable staging layer) ──────────
+    // ── 4. Upsert raw_borrowers ────────────────────────────────────
+    // Schema: id, loandisk_id(bigint), branch_id(bigint), payload(jsonb),
+    //         source(text), fetched_at, created_at, updated_at
+    // Unique: (loandisk_id, branch_id)
 
     const { error: rawErr } = await supabase
       .from("raw_borrowers")
       .upsert(
         {
-          external_id: externalId,
-          provider: "loandisk",
-          raw_data: payload,
-          first_name: borrower.first_name || null,
-          last_name: borrower.last_name || null,
-          full_name: buildFullName(borrower),
-          phone_number: resolvePhone(borrower),
-          nida_number: resolveNida(borrower),
-          email: borrower.email || null,
-          status: borrower.status || "active",
-          received_at: new Date().toISOString(),
+          loandisk_id: loandiskId,
+          branch_id: branchId,
+          payload: payload,
+          source: "webhook",
+          fetched_at: new Date().toISOString(),
         },
-        { onConflict: "external_id,provider" }
+        { onConflict: "loandisk_id,branch_id" }
       );
 
     if (rawErr) {
       console.error("raw_borrowers upsert error:", rawErr.message);
-      // Non-fatal — continue to try canonical upsert
     }
 
     // ── 5. Transform & upsert canonical client record ──────────────
+    // clients has no unique constraint on external_reference_id,
+    // so we use select-then-insert/update pattern.
 
     const action = mapAction(eventKey);
     let localId: string | null = null;
+    const names = splitName(borrower);
+    const now = new Date().toISOString();
 
     if (action !== "deleted") {
-      const clientPayload = {
-        first_name: borrower.first_name || buildFullName(borrower).split(" ")[0] || "Unknown",
-        last_name: borrower.last_name || buildFullName(borrower).split(" ").slice(1).join(" ") || "",
-        phone_number: resolvePhone(borrower),
+      const clientFields = {
+        first_name: names.first,
+        middle_name: names.middle || null,
+        last_name: names.last,
+        phone_number: resolvePhone(borrower) || "0000000000",
         nida_number: resolveNida(borrower),
         business_type: borrower.business_type || null,
         business_location: borrower.business_location || null,
-        revenue_estimate: borrower.revenue_estimate || null,
+        revenue_estimate: borrower.revenue_estimate ?? null,
         status: borrower.status || "active",
-        external_reference_id: externalId,
+        external_reference_id: externalRef,
         next_of_kin_name: borrower.next_of_kin_name || null,
         next_of_kin_relationship: borrower.next_of_kin_relationship || null,
         next_of_kin_phone: borrower.next_of_kin_phone || null,
@@ -230,40 +269,63 @@ Deno.serve(async (req: Request) => {
         region: borrower.region || null,
         district: borrower.district || null,
         street: borrower.street || borrower.address || null,
-        updated_at: new Date().toISOString(),
+        updated_at: now,
       };
 
-      const { data: clientData, error: clientErr } = await supabase
+      // Check if client already exists by external_reference_id
+      const { data: existing } = await supabase
         .from("clients")
-        .upsert(clientPayload, { onConflict: "external_reference_id" })
         .select("id")
-        .single();
+        .eq("external_reference_id", externalRef)
+        .limit(1)
+        .maybeSingle();
 
-      if (clientErr) {
-        console.error("clients upsert error:", clientErr.message);
+      if (existing) {
+        // Update existing client
+        const { error: updateErr } = await supabase
+          .from("clients")
+          .update(clientFields)
+          .eq("id", existing.id);
+
+        if (updateErr) {
+          console.error("clients update error:", updateErr.message);
+        } else {
+          localId = existing.id;
+        }
       } else {
-        localId = clientData?.id || null;
+        // Insert new client
+        const { data: newClient, error: insertErr } = await supabase
+          .from("clients")
+          .insert(clientFields)
+          .select("id")
+          .single();
+
+        if (insertErr) {
+          console.error("clients insert error:", insertErr.message);
+        } else {
+          localId = newClient?.id || null;
+        }
       }
     } else {
       // Soft-delete: mark client as inactive
       const { data: existing } = await supabase
         .from("clients")
         .select("id")
-        .eq("external_reference_id", externalId)
+        .eq("external_reference_id", externalRef)
+        .limit(1)
         .maybeSingle();
 
       if (existing) {
         localId = existing.id;
         await supabase
           .from("clients")
-          .update({ status: "inactive", updated_at: new Date().toISOString() })
+          .update({ status: "inactive", updated_at: now })
           .eq("id", existing.id);
       }
     }
 
     // ── 6. Record sync lineage ─────────────────────────────────────
 
-    // Find active integration (or use default)
     const { data: integration } = await supabase
       .from("loandisk_integrations")
       .select("id")
@@ -273,8 +335,6 @@ Deno.serve(async (req: Request) => {
 
     const integrationId = integration?.id || "00000000-0000-0000-0000-000000000000";
 
-    // Create sync run
-    const now = new Date().toISOString();
     const { data: syncRun, error: syncRunErr } = await supabase
       .from("loandisk_sync_runs")
       .insert({
@@ -285,7 +345,7 @@ Deno.serve(async (req: Request) => {
         status: rawErr || !localId ? "partial" : "completed",
         records_fetched: 1,
         records_created: action === "created" && localId ? 1 : 0,
-        records_updated: action === "updated" && localId ? 1 : 0,
+        records_updated: (action === "updated" || action === "upserted") && localId ? 1 : 0,
         records_skipped: 0,
         records_failed: localId ? 0 : 1,
         entity_types: ["borrower"],
@@ -299,11 +359,11 @@ Deno.serve(async (req: Request) => {
       await supabase.from("loandisk_sync_items").insert({
         sync_run_id: syncRun.id,
         entity_type: "borrower",
-        external_id: externalId,
+        external_id: String(loandiskId),
         action: action,
         local_id: localId,
         source_data: payload,
-        transformed_data: localId ? { client_id: localId } : null,
+        transformed_data: localId ? { client_id: localId, external_ref: externalRef } : null,
         error_message: rawErr?.message || null,
         synced_at: now,
       });
@@ -316,18 +376,18 @@ Deno.serve(async (req: Request) => {
     await supabase.from("loandisk_access_log").insert({
       user_id: "webhook",
       action: `webhook_${action}`,
-      resource: `borrower/${externalId}`,
+      resource: `borrower/${loandiskId}`,
       ip_address: req.headers.get("x-forwarded-for") || req.headers.get("cf-connecting-ip") || "unknown",
       user_agent: req.headers.get("user-agent") || "unknown",
       accessed_at: now,
-      metadata: { event_key: eventKey, local_id: localId },
+      metadata: { event_key: eventKey, local_id: localId, branch_id: branchId },
     });
 
     // ── 8. Return success ──────────────────────────────────────────
 
     const durationMs = Date.now() - startTime;
 
-    // Record invocation metric (non-blocking)
+    // Record invocation metric (fire-and-forget)
     supabase.from("edge_function_invocations").insert({
       function_name: "loandisk-webhook-borrower",
       invoked_at: now,
@@ -335,14 +395,14 @@ Deno.serve(async (req: Request) => {
       status: "success",
       request_size_bytes: Number(req.headers.get("content-length") || 0),
       response_size_bytes: 0,
-      metadata: { event_key: eventKey, external_id: externalId, local_id: localId },
+      metadata: { event_key: eventKey, loandisk_id: loandiskId, local_id: localId },
     });
 
     return new Response(
       JSON.stringify({
         success: true,
         event: eventKey,
-        external_id: externalId,
+        loandisk_id: loandiskId,
         local_id: localId,
         action: action,
         duration_ms: durationMs,
@@ -350,14 +410,12 @@ Deno.serve(async (req: Request) => {
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (err) {
-    errorMessage = err instanceof Error ? err.message : String(err);
+    const errorMessage = err instanceof Error ? err.message : String(err);
     console.error("loandisk-webhook-borrower error:", errorMessage);
 
     const durationMs = Date.now() - startTime;
 
-    // Record failed invocation (non-blocking)
     try {
-      const supabase = getServiceClient();
       supabase.from("edge_function_invocations").insert({
         function_name: "loandisk-webhook-borrower",
         invoked_at: new Date().toISOString(),
