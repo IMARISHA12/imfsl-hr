@@ -339,7 +339,7 @@ Deno.serve(async (req: Request) => {
       .from("loandisk_sync_runs")
       .insert({
         integration_id: integrationId,
-        run_type: "webhook",
+        run_type: "manual",
         started_at: now,
         completed_at: now,
         status: rawErr || !localId ? "partial" : "completed",
@@ -349,7 +349,6 @@ Deno.serve(async (req: Request) => {
         records_skipped: 0,
         records_failed: localId ? 0 : 1,
         entity_types: ["borrower"],
-        triggered_by: "loandisk-webhook",
         error_message: rawErr?.message || null,
       })
       .select("id")
