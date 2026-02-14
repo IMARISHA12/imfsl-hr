@@ -262,7 +262,7 @@ Deno.serve(async (req: Request) => {
         const { data, error } = await supabase
           .from("v_performance_dashboard")
           .select("*")
-          .eq("employee_code", body.employee_id)
+          .eq("employee_id", body.employee_id)
           .order("period_start", { ascending: false });
 
         if (error) throw error;

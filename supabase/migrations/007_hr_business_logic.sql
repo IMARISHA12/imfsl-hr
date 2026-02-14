@@ -1254,6 +1254,7 @@ SELECT
   prc.period_end,
   prc.status AS cycle_status,
   pr.id AS review_id,
+  pr.employee_id,
   e.full_name AS employee_name,
   e.employee_code,
   e.dept AS department,
