@@ -443,6 +443,20 @@ class _HrDashboardWidgetState extends State<HrDashboardWidget> {
             ),
             _actionTile(
               context,
+              icon: Icons.person_outline,
+              label: 'Wasifu',
+              color: const Color(0xFF1E3A8A),
+              onTap: () => context.pushNamed(HrProfileWidget.routeName),
+            ),
+            _actionTile(
+              context,
+              icon: Icons.approval,
+              label: 'Idhini',
+              color: const Color(0xFF059669),
+              onTap: () => context.pushNamed(HrManagerApprovalsWidget.routeName),
+            ),
+            _actionTile(
+              context,
               icon: Icons.home_outlined,
               label: 'Nyumbani',
               color: const Color(0xFF6B7280),
