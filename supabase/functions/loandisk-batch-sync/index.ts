@@ -169,7 +169,7 @@ Deno.serve(async (req: Request) => {
               );
 
             // Upsert borrowers table
-            const borrowerFields = transformBorrower(b);
+            const borrowerFields = { ...transformBorrower(b), external_reference_id: externalRef };
             const { data: existingBorrower } = await supabase
               .from("borrowers")
               .select("id")

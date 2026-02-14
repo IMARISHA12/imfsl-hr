@@ -55,45 +55,124 @@ export function resolveNida(b: LoandiskBorrower): string | null {
   return b.nida_number || b.national_id || null;
 }
 
+function resolveGps(b: LoandiskBorrower): { lat: number | null; lng: number | null } {
+  const lat = b.gps_latitude != null ? Number(b.gps_latitude) : null;
+  const lng = b.gps_longitude != null ? Number(b.gps_longitude) : null;
+  return {
+    lat: lat != null && Number.isFinite(lat) ? lat : null,
+    lng: lng != null && Number.isFinite(lng) ? lng : null,
+  };
+}
+
 /**
  * Transform LoanDisk borrower → `borrowers` table row.
- * borrowers: id, full_name(NOT NULL), phone_number(NOT NULL),
- *            nida_number, location_gps, status, created_by, created_at
+ * Captures the full borrower profile from LoanDisk.
  */
 export function transformBorrower(b: LoandiskBorrower) {
+  const gps = resolveGps(b);
   return {
     full_name: buildFullName(b),
     phone_number: resolvePhone(b),
     nida_number: resolveNida(b),
     location_gps: b.region ? `${b.region}${b.district ? ', ' + b.district : ''}` : null,
     status: b.status || "active",
+    // Extended fields
+    borrower_code: b.borrower_code || null,
+    email: b.email || null,
+    gender: b.gender || null,
+    date_of_birth: b.date_of_birth || null,
+    marital_status: b.marital_status || null,
+    credit_rating: b.credit_rating || b.credit || null,
+    // Business
+    business_name: b.business_name || null,
+    business_type: b.business_type || null,
+    business_role: b.business_role || b.occupation || null,
+    business_location: b.business_location || null,
+    revenue_estimate: b.revenue_estimate ?? null,
+    // Location
+    address: b.address || b.location || null,
+    region: b.region || null,
+    district: b.district || null,
+    street: b.street || null,
+    gps_latitude: gps.lat,
+    gps_longitude: gps.lng,
+    // Contact
+    alternative_phone: b.alternative_phone || null,
+    // Banking
+    bank_name: b.bank_name || null,
+    bank_account_number: b.bank_account_number || b.bank_account || null,
+    // Documents
+    drivers_license: b.drivers_license || b.driving_license || null,
+    vehicle_info: b.vehicle_info || b.vehicle || null,
+    photo_url: b.photo_url || null,
+    // Guarantor / Next of kin
+    next_of_kin_name: b.next_of_kin_name || null,
+    next_of_kin_relationship: b.next_of_kin_relationship || null,
+    next_of_kin_phone: b.next_of_kin_phone || null,
+    guarantor_name: b.guarantor_name || null,
+    guarantor_phone: b.guarantor_phone || null,
+    guarantor_relationship: b.guarantor_relationship || null,
+    // Officer
+    loan_officer_name: b.loan_officer_name || b.loan_officer || null,
+    // Notes
+    notes: b.notes || b.other_info || null,
+    updated_at: new Date().toISOString(),
   };
 }
 
 /**
  * Transform LoanDisk borrower → `clients` table row.
- * Provides richer fields than the simpler `borrowers` table.
+ * Provides the richest profile view for Retool dashboards.
  */
 export function transformClient(b: LoandiskBorrower, externalRef: string) {
   const names = splitName(b);
+  const gps = resolveGps(b);
   return {
     first_name: names.first,
     middle_name: names.middle || null,
     last_name: names.last,
+    full_name: buildFullName(b),
     phone_number: resolvePhone(b),
     nida_number: resolveNida(b),
-    business_type: b.business_type || null,
-    business_location: b.business_location || null,
-    revenue_estimate: b.revenue_estimate ?? null,
     status: b.status || "active",
     external_reference_id: externalRef,
+    // Extended profile
+    borrower_code: b.borrower_code || null,
+    gender: b.gender || null,
+    date_of_birth: b.date_of_birth || null,
+    marital_status: b.marital_status || null,
+    credit_rating: b.credit_rating || b.credit || null,
+    // Business
+    business_type: b.business_type || null,
+    business_name: b.business_name || null,
+    business_role: b.business_role || b.occupation || null,
+    business_location: b.business_location || null,
+    revenue_estimate: b.revenue_estimate ?? null,
+    // Location
+    address: b.address || b.location || null,
+    region: b.region || null,
+    district: b.district || null,
+    street: b.street || null,
+    gps_latitude: gps.lat,
+    gps_longitude: gps.lng,
+    // Contact
+    alternative_phone: b.alternative_phone || null,
     next_of_kin_name: b.next_of_kin_name || null,
     next_of_kin_relationship: b.next_of_kin_relationship || null,
     next_of_kin_phone: b.next_of_kin_phone || null,
+    guarantor_name: b.guarantor_name || null,
+    guarantor_phone: b.guarantor_phone || null,
+    guarantor_relationship: b.guarantor_relationship || null,
+    // Banking
+    bank_name: b.bank_name || null,
+    bank_account_number: b.bank_account_number || b.bank_account || null,
+    // Documents
+    drivers_license: b.drivers_license || b.driving_license || null,
+    vehicle_info: b.vehicle_info || b.vehicle || null,
     photo_url: b.photo_url || null,
-    region: b.region || null,
-    district: b.district || null,
-    street: b.street || b.address || null,
+    // Officer / Notes
+    loan_officer_name: b.loan_officer_name || b.loan_officer || null,
+    notes: b.notes || b.other_info || null,
     updated_at: new Date().toISOString(),
   };
 }
@@ -171,34 +250,47 @@ function resolveDaysOverdue(l: LoandiskLoan): number {
 /**
  * Transform LoanDisk loan → `loans` table row.
  *
- * loans schema:
- *   id, borrower_id(FK→borrowers, NOT NULL), amount_principal(NOT NULL),
- *   interest_rate(NOT NULL), duration_months(NOT NULL), total_due,
- *   start_date, status, approved_by, created_at, loan_number,
- *   officer_id, outstanding_balance, total_paid, days_overdue,
- *   last_payment_date, product_type, disbursed_at, branch
- *
  * Note: total_due is a GENERATED column (computed from principal * rate),
  *       so we never include it in inserts/updates.
  */
 export function transformLoan(l: LoandiskLoan, localBorrowerId: string) {
+  const interestPaid = l.interest_paid != null ? Number(l.interest_paid) : null;
+  const penaltyAmount = l.penalty_amount != null ? Number(l.penalty_amount) : null;
+  const collateralValue = l.collateral_value != null ? Number(l.collateral_value) : null;
+
   return {
     borrower_id: localBorrowerId,
     amount_principal: resolvePrincipal(l),
     interest_rate: resolveInterestRate(l),
     duration_months: resolveDuration(l),
-    start_date: l.start_date || l.disbursed_date || l.disbursed_at || null,
+    start_date: l.start_date || l.disbursed_date || l.disbursed_at || l.released_date || null,
     status: mapLoanStatus(l.status),
     approved_by: l.approved_by || null,
     loan_number: l.loan_number || null,
-    officer_id: l.officer_id ? String(l.officer_id) : (l.loan_officer || null),
+    officer_id: l.officer_id ? String(l.officer_id) : null,
     outstanding_balance: resolveOutstanding(l),
     total_paid: resolveTotalPaid(l),
     days_overdue: resolveDaysOverdue(l),
     last_payment_date: l.last_payment_date || null,
     product_type: l.product_type || l.loan_product || "sme_group",
-    disbursed_at: l.disbursed_at || l.disbursed_date || null,
+    disbursed_at: l.disbursed_at || l.disbursed_date || l.released_date || null,
     branch: l.branch_id ? String(l.branch_id) : null,
+    // Extended fields
+    maturity_date: l.maturity_date || l.end_date || null,
+    interest_method: l.interest_method || null,
+    interest_rate_period: l.interest_rate_period || l.duration_period || "month",
+    interest_paid: interestPaid != null && Number.isFinite(interestPaid) ? interestPaid : null,
+    penalty_amount: penaltyAmount != null && Number.isFinite(penaltyAmount) ? penaltyAmount : null,
+    disbursed_by: l.disbursed_by || null,
+    repayment_frequency: l.repayment_frequency || null,
+    next_payment_date: l.next_payment_date || null,
+    loan_purpose: l.loan_purpose || l.purpose || null,
+    collateral: l.collateral || null,
+    collateral_value: collateralValue != null && Number.isFinite(collateralValue) ? collateralValue : null,
+    loan_officer_name: l.loan_officer_name || l.loan_officer || null,
+    approved_date: l.approved_date || null,
+    notes: l.notes || null,
+    updated_at: new Date().toISOString(),
   };
 }
 

@@ -134,7 +134,7 @@ async function handleBorrower(
 
   if (action !== "deleted") {
     // Upsert borrowers table
-    const borrowerFields = transformBorrower(borrower);
+    const borrowerFields = { ...transformBorrower(borrower), external_reference_id: externalRef };
     const { data: existingBorrower } = await supabase
       .from("borrowers")
       .select("id")
