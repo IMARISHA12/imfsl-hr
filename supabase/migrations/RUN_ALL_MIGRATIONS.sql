@@ -452,9 +452,16 @@ GRANT SELECT ON public.v_loan_details TO service_role, authenticated;
 GRANT SELECT ON public.v_repayment_history TO service_role, authenticated;
 
 -- ┌─────────────────────────────────────────────────────────────────────────┐
--- │ NOTE: Migrations 006 & 007 must be run from their individual files     │
--- │ - 006_fineract_integration.sql  (Fineract core banking integration)   │
--- │ - 007_hr_business_logic.sql     (Payroll, Leave, Attendance, Perf.)   │
+-- │ NOTE: Migrations 006–008 must be run from their individual files       │
+-- │                                                                        │
+-- │ Run in order:                                                          │
+-- │   1. 006_fineract_integration.sql  (Fineract core banking integration)│
+-- │   2. 007_hr_business_logic.sql     (Payroll, Leave, Attendance, Perf.)│
+-- │   3. 008_scheduled_tasks.sql       (Cron jobs, arrears, leave accrual)│
+-- │                                                                        │
+-- │ After migrations, run seed data:                                       │
+-- │   4. seed/003_hr_master_data.sql   (Tax brackets, deductions, leaves) │
+-- │                                                                        │
 -- │ These are too large for a single SQL Editor run.                       │
 -- └─────────────────────────────────────────────────────────────────────────┘
 

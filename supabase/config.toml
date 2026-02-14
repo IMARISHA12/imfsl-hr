@@ -2,3 +2,15 @@ project_id = "lzyixazjquouicfsfzzu"
 
 [functions.loandisk-webhook-borrower]
 verify_jwt = false
+
+[functions.hr-payroll-processor]
+verify_jwt = false
+
+[functions.hr-leave-workflow]
+verify_jwt = false
+
+[functions.hr-attendance]
+verify_jwt = false
+
+[functions.hr-performance-review]
+verify_jwt = false
