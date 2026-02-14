@@ -11,6 +11,7 @@
 -- ═══════════════════════════════════════════════════════════════════════
 
 ALTER TABLE public.borrowers ADD COLUMN IF NOT EXISTS borrower_code text;
+ALTER TABLE public.borrowers ADD COLUMN IF NOT EXISTS title text;
 ALTER TABLE public.borrowers ADD COLUMN IF NOT EXISTS email text;
 ALTER TABLE public.borrowers ADD COLUMN IF NOT EXISTS gender text;
 ALTER TABLE public.borrowers ADD COLUMN IF NOT EXISTS date_of_birth date;
@@ -57,6 +58,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_borrowers_ext_ref_unique
 -- ═══════════════════════════════════════════════════════════════════════
 
 ALTER TABLE public.clients ADD COLUMN IF NOT EXISTS borrower_code text;
+ALTER TABLE public.clients ADD COLUMN IF NOT EXISTS title text;
 ALTER TABLE public.clients ADD COLUMN IF NOT EXISTS full_name text;
 ALTER TABLE public.clients ADD COLUMN IF NOT EXISTS gender text;
 ALTER TABLE public.clients ADD COLUMN IF NOT EXISTS date_of_birth date;
@@ -87,6 +89,7 @@ ALTER TABLE public.loans ADD COLUMN IF NOT EXISTS interest_method text;
 ALTER TABLE public.loans ADD COLUMN IF NOT EXISTS interest_rate_period text DEFAULT 'month';
 ALTER TABLE public.loans ADD COLUMN IF NOT EXISTS interest_paid numeric DEFAULT 0;
 ALTER TABLE public.loans ADD COLUMN IF NOT EXISTS penalty_amount numeric DEFAULT 0;
+ALTER TABLE public.loans ADD COLUMN IF NOT EXISTS fees numeric DEFAULT 0;
 ALTER TABLE public.loans ADD COLUMN IF NOT EXISTS disbursed_by text;
 ALTER TABLE public.loans ADD COLUMN IF NOT EXISTS repayment_frequency text;
 ALTER TABLE public.loans ADD COLUMN IF NOT EXISTS next_payment_date date;
@@ -107,6 +110,7 @@ CREATE OR REPLACE VIEW public.v_borrower_profiles AS
 SELECT
   b.id,
   b.borrower_code,
+  b.title,
   b.full_name,
   b.phone_number,
   b.email,
@@ -202,6 +206,7 @@ SELECT
   l.outstanding_balance,
   l.total_paid,
   l.interest_paid,
+  l.fees,
   l.penalty_amount,
   l.days_overdue,
   l.status,

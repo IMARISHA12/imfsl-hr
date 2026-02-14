@@ -312,6 +312,7 @@ CREATE TRIGGER trg_borrowers_normalize BEFORE INSERT OR UPDATE ON public.borrowe
 
 -- Borrowers: add full profile fields
 ALTER TABLE public.borrowers ADD COLUMN IF NOT EXISTS borrower_code text;
+ALTER TABLE public.borrowers ADD COLUMN IF NOT EXISTS title text;
 ALTER TABLE public.borrowers ADD COLUMN IF NOT EXISTS email text;
 ALTER TABLE public.borrowers ADD COLUMN IF NOT EXISTS gender text;
 ALTER TABLE public.borrowers ADD COLUMN IF NOT EXISTS date_of_birth date;
@@ -349,6 +350,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_borrowers_ext_ref_unique ON public.borrowe
 
 -- Clients: add KYC/document fields
 ALTER TABLE public.clients ADD COLUMN IF NOT EXISTS borrower_code text;
+ALTER TABLE public.clients ADD COLUMN IF NOT EXISTS title text;
 ALTER TABLE public.clients ADD COLUMN IF NOT EXISTS full_name text;
 ALTER TABLE public.clients ADD COLUMN IF NOT EXISTS gender text;
 ALTER TABLE public.clients ADD COLUMN IF NOT EXISTS date_of_birth date;
@@ -376,6 +378,7 @@ ALTER TABLE public.loans ADD COLUMN IF NOT EXISTS interest_method text;
 ALTER TABLE public.loans ADD COLUMN IF NOT EXISTS interest_rate_period text DEFAULT 'month';
 ALTER TABLE public.loans ADD COLUMN IF NOT EXISTS interest_paid numeric DEFAULT 0;
 ALTER TABLE public.loans ADD COLUMN IF NOT EXISTS penalty_amount numeric DEFAULT 0;
+ALTER TABLE public.loans ADD COLUMN IF NOT EXISTS fees numeric DEFAULT 0;
 ALTER TABLE public.loans ADD COLUMN IF NOT EXISTS disbursed_by text;
 ALTER TABLE public.loans ADD COLUMN IF NOT EXISTS repayment_frequency text;
 ALTER TABLE public.loans ADD COLUMN IF NOT EXISTS next_payment_date date;
@@ -390,7 +393,7 @@ ALTER TABLE public.loans ADD COLUMN IF NOT EXISTS updated_at timestamptz DEFAULT
 -- Retool Views
 CREATE OR REPLACE VIEW public.v_borrower_profiles AS
 SELECT
-  b.id, b.borrower_code, b.full_name, b.phone_number, b.email, b.nida_number,
+  b.id, b.borrower_code, b.title, b.full_name, b.phone_number, b.email, b.nida_number,
   b.gender, b.date_of_birth,
   CASE WHEN b.date_of_birth IS NOT NULL
     THEN extract(year from age(current_date, b.date_of_birth))::int ELSE NULL END AS age_years,
@@ -421,7 +424,7 @@ SELECT
   b.borrower_code, l.loan_officer_name, l.officer_id,
   l.amount_principal, l.interest_rate, l.interest_rate_period, l.interest_method,
   l.duration_months, l.total_due, l.outstanding_balance, l.total_paid, l.interest_paid,
-  l.penalty_amount, l.days_overdue, l.status, l.product_type,
+  l.fees, l.penalty_amount, l.days_overdue, l.status, l.product_type,
   l.start_date, l.disbursed_at, l.disbursed_by, l.maturity_date,
   l.last_payment_date, l.next_payment_date, l.repayment_frequency,
   l.approved_by, l.approved_date, l.loan_purpose, l.collateral, l.collateral_value,

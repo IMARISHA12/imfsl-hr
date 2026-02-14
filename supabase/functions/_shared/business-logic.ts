@@ -78,6 +78,7 @@ export function transformBorrower(b: LoandiskBorrower) {
     status: b.status || "active",
     // Extended fields
     borrower_code: b.borrower_code || null,
+    title: b.title || null,
     email: b.email || null,
     gender: b.gender || null,
     date_of_birth: b.date_of_birth || null,
@@ -138,6 +139,7 @@ export function transformClient(b: LoandiskBorrower, externalRef: string) {
     external_reference_id: externalRef,
     // Extended profile
     borrower_code: b.borrower_code || null,
+    title: b.title || null,
     gender: b.gender || null,
     date_of_birth: b.date_of_birth || null,
     marital_status: b.marital_status || null,
@@ -256,6 +258,7 @@ function resolveDaysOverdue(l: LoandiskLoan): number {
 export function transformLoan(l: LoandiskLoan, localBorrowerId: string) {
   const interestPaid = l.interest_paid != null ? Number(l.interest_paid) : null;
   const penaltyAmount = l.penalty_amount != null ? Number(l.penalty_amount) : null;
+  const feesAmount = l.fees != null ? Number(l.fees) : (l.fee_amount != null ? Number(l.fee_amount) : null);
   const collateralValue = l.collateral_value != null ? Number(l.collateral_value) : null;
 
   return {
@@ -281,6 +284,7 @@ export function transformLoan(l: LoandiskLoan, localBorrowerId: string) {
     interest_rate_period: l.interest_rate_period || l.duration_period || "month",
     interest_paid: interestPaid != null && Number.isFinite(interestPaid) ? interestPaid : null,
     penalty_amount: penaltyAmount != null && Number.isFinite(penaltyAmount) ? penaltyAmount : null,
+    fees: feesAmount != null && Number.isFinite(feesAmount) ? feesAmount : null,
     disbursed_by: l.disbursed_by || null,
     repayment_frequency: l.repayment_frequency || null,
     next_payment_date: l.next_payment_date || null,
@@ -307,6 +311,9 @@ const PAYMENT_METHOD_MAP: Record<string, string> = {
   bank: "bank_transfer",
   cheque: "cheque",
   check: "cheque",
+  deduction: "deduction",
+  "deduction from loan": "deduction",
+  loan_deduction: "deduction",
 };
 
 function mapPaymentMethod(raw: string | undefined): string {

@@ -13,6 +13,7 @@ export interface LoandiskBorrower {
   branch_id?: number | string;
   // Identity
   borrower_code?: string;
+  title?: string;
   first_name?: string;
   last_name?: string;
   middle_name?: string;
@@ -108,6 +109,8 @@ export interface LoandiskLoan {
   amount_paid?: number;
   total_paid?: number;
   penalty_amount?: number;
+  fees?: number;
+  fee_amount?: number;
   // Status
   status?: string;
   // Dates
