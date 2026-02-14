@@ -157,39 +157,21 @@ CREATE TABLE IF NOT EXISTS public.fineract_reconciliation_snapshots (
 );
 
 -- ═══════════════════════════════════════════════════════════════════════
--- PART E: LOAN PRODUCTS (Fineract loan product catalog)
+-- PART E: LOAN PRODUCTS (add Fineract columns to existing table)
 -- ═══════════════════════════════════════════════════════════════════════
 
-CREATE TABLE IF NOT EXISTS public.loan_products (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  fineract_id bigint UNIQUE,
-  name text NOT NULL,
-  short_name text,
-  description text,
-  currency_code text NOT NULL DEFAULT 'TZS',
-  principal_min numeric,
-  principal_default numeric,
-  principal_max numeric,
-  interest_rate_min numeric,
-  interest_rate_default numeric,
-  interest_rate_max numeric,
-  interest_rate_frequency text DEFAULT 'per_month',
-  interest_method text DEFAULT 'declining_balance',
-  interest_calculation_period text DEFAULT 'same_as_repayment',
-  repayment_frequency text DEFAULT 'monthly',
-  number_of_repayments_min int,
-  number_of_repayments_default int,
-  number_of_repayments_max int,
-  amortization_type text DEFAULT 'equal_installments',
-  grace_on_principal int DEFAULT 0,
-  grace_on_interest int DEFAULT 0,
-  grace_on_interest_charged int DEFAULT 0,
-  include_in_borrower_cycle boolean DEFAULT false,
-  accounting_rule text DEFAULT 'none',
-  is_active boolean DEFAULT true,
-  created_at timestamptz NOT NULL DEFAULT now(),
-  updated_at timestamptz NOT NULL DEFAULT now()
-);
+-- loan_products already exists; add Fineract-specific columns
+ALTER TABLE public.loan_products ADD COLUMN IF NOT EXISTS fineract_id bigint UNIQUE;
+ALTER TABLE public.loan_products ADD COLUMN IF NOT EXISTS currency_code text DEFAULT 'TZS';
+ALTER TABLE public.loan_products ADD COLUMN IF NOT EXISTS interest_rate_frequency text DEFAULT 'per_month';
+ALTER TABLE public.loan_products ADD COLUMN IF NOT EXISTS interest_method text DEFAULT 'declining_balance';
+ALTER TABLE public.loan_products ADD COLUMN IF NOT EXISTS repayment_frequency text DEFAULT 'monthly';
+ALTER TABLE public.loan_products ADD COLUMN IF NOT EXISTS amortization_type text DEFAULT 'equal_installments';
+ALTER TABLE public.loan_products ADD COLUMN IF NOT EXISTS grace_on_principal int DEFAULT 0;
+ALTER TABLE public.loan_products ADD COLUMN IF NOT EXISTS grace_on_interest int DEFAULT 0;
+ALTER TABLE public.loan_products ADD COLUMN IF NOT EXISTS grace_on_interest_charged int DEFAULT 0;
+ALTER TABLE public.loan_products ADD COLUMN IF NOT EXISTS include_in_borrower_cycle boolean DEFAULT false;
+ALTER TABLE public.loan_products ADD COLUMN IF NOT EXISTS accounting_rule text DEFAULT 'none';
 
 -- ═══════════════════════════════════════════════════════════════════════
 -- PART F: LOAN SCHEDULE (amortization schedule from Fineract)
@@ -382,7 +364,7 @@ FROM public.loans;
 -- K2. Loan Officer Performance
 CREATE OR REPLACE VIEW public.v_loan_officer_performance AS
 SELECT
-  coalesce(l.loan_officer_name, 'Unassigned') AS loan_officer,
+  coalesce(s.full_name, 'Unassigned') AS loan_officer,
   count(*) AS total_loans,
   count(*) FILTER (WHERE l.status = 'active') AS active_loans,
   count(*) FILTER (WHERE l.status = 'completed') AS completed_loans,
@@ -397,13 +379,14 @@ SELECT
   END AS collection_rate_pct,
   count(DISTINCT l.borrower_id) AS unique_borrowers
 FROM public.loans l
-GROUP BY l.loan_officer_name;
+LEFT JOIN public.staff s ON s.id = l.officer_id
+GROUP BY s.full_name;
 
 -- K3. Product Performance
 CREATE OR REPLACE VIEW public.v_product_performance AS
 SELECT
-  coalesce(lp.name, l.product_type, 'Unknown') AS product_name,
-  lp.short_name AS product_code,
+  coalesce(lp.product_name, l.product_type, 'Unknown') AS product_name,
+  lp.product_code,
   count(*) AS total_loans,
   count(*) FILTER (WHERE l.status = 'active') AS active_loans,
   coalesce(sum(l.amount_principal), 0) AS total_disbursed,
@@ -419,7 +402,7 @@ SELECT
   END AS par_pct
 FROM public.loans l
 LEFT JOIN public.loan_products lp ON lp.id = l.loan_product_id
-GROUP BY lp.name, lp.short_name, l.product_type;
+GROUP BY lp.product_name, lp.product_code, l.product_type;
 
 -- K4. Aging Analysis (PAR bands)
 CREATE OR REPLACE VIEW public.v_aging_analysis AS
@@ -481,47 +464,30 @@ SELECT
   c.id AS client_id,
   c.fineract_id AS fineract_client_id,
   c.external_reference_id,
-  c.borrower_code,
-  c.title,
   c.first_name,
   c.middle_name,
   c.last_name,
-  c.full_name,
+  concat_ws(' ', c.first_name, c.middle_name, c.last_name) AS full_name,
   c.phone_number,
   c.nida_number,
-  c.email,
-  c.gender,
-  c.date_of_birth,
-  c.marital_status,
+  c.status,
   c.activation_date,
   c.credit_score,
   c.risk_level,
-  c.credit_rating,
-  c.status,
   -- Business info
   c.business_type,
-  c.business_name,
-  c.business_role,
   c.business_location,
   c.revenue_estimate,
   -- Location
-  c.address,
   c.region,
   c.district,
   c.street,
   c.gps_latitude,
   c.gps_longitude,
-  -- Banking
-  c.bank_name,
-  c.bank_account_number,
   -- Contacts
-  c.alternative_phone,
   c.next_of_kin_name,
   c.next_of_kin_phone,
-  c.guarantor_name,
-  c.guarantor_phone,
   -- Officer
-  c.loan_officer_name,
   fs.display_name AS assigned_officer_name,
   fo.name AS office_name,
   -- Loan summary
@@ -641,8 +607,6 @@ BEGIN
 
   UPDATE public.loans SET
     status = 'active',
-    approved_by = p_approved_by,
-    approved_date = current_date,
     updated_at = now()
   WHERE id = p_loan_id;
 
@@ -673,7 +637,6 @@ BEGIN
 
   UPDATE public.loans SET
     disbursed_at = p_disbursement_date::timestamptz,
-    disbursed_by = p_disbursed_by,
     start_date = p_disbursement_date,
     outstanding_balance = amount_principal,
     updated_at = now()
@@ -692,7 +655,7 @@ CREATE OR REPLACE FUNCTION public.rpc_record_repayment(
   p_amount numeric,
   p_payment_method text DEFAULT 'cash',
   p_receipt_ref text DEFAULT NULL,
-  p_collected_by text DEFAULT 'system',
+  p_collected_by uuid DEFAULT NULL,
   p_payment_date timestamptz DEFAULT now(),
   p_notes text DEFAULT NULL
 ) RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER AS $$
@@ -740,7 +703,7 @@ BEGIN
   WHERE id = p_loan_id;
 
   INSERT INTO public.loan_lifecycle_events (loan_id, event_type, from_status, to_status, amount, performed_by, notes, event_date)
-  VALUES (p_loan_id, 'repayment', v_loan.status, v_new_status, p_amount, p_collected_by, p_notes, p_payment_date);
+  VALUES (p_loan_id, 'repayment', v_loan.status, v_new_status, p_amount, 'system', p_notes, p_payment_date);
 
   RETURN jsonb_build_object(
     'success', true,
@@ -809,7 +772,6 @@ BEGIN
     duration_months = p_new_duration_months,
     interest_rate = coalesce(p_new_interest_rate, interest_rate),
     grace_on_principal = p_grace_period,
-    maturity_date = start_date + (p_new_duration_months || ' months')::interval,
     expected_maturity_date = start_date + (p_new_duration_months || ' months')::interval,
     status = 'active',
     in_arrears = false,
@@ -850,7 +812,7 @@ BEGIN
     'loan_id', l.id, 'loan_number', l.loan_number, 'product', l.product_type,
     'principal', l.amount_principal, 'outstanding', l.outstanding_balance,
     'total_paid', l.total_paid, 'status', l.status, 'days_overdue', l.days_overdue,
-    'start_date', l.start_date, 'maturity_date', l.maturity_date
+    'start_date', l.start_date, 'maturity_date', l.expected_maturity_date
   ) ORDER BY l.created_at DESC) INTO v_loans
   FROM public.loans l
   JOIN public.borrowers b ON b.id = l.borrower_id
