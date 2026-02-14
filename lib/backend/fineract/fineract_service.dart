@@ -1,6 +1,8 @@
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' hide Provider;
 
 import '/backend/supabase/supabase.dart';
+import '/auth/supabase_auth/auth_util.dart';
 import 'fineract_config.dart';
 
 /// Entity types that can be synced with Apache Fineract.
@@ -17,10 +19,13 @@ enum FineractEntityType {
 
 /// High-level service for the Apache Fineract integration.
 ///
-/// Handles configuration loading from the `fineract_integrations` table,
-/// sync run management, entity mapping lookups, and access logging.
-/// Actual Fineract API calls are proxied through Firebase Cloud Functions
-/// (see `firebase/functions/fineract_client.js`).
+/// Provides typed methods for every supported Fineract operation. Each call:
+/// 1. Invokes the `fineractApi` Firebase callable function
+/// 2. Logs the access in `fineract_access_log` for auditing
+/// 3. Returns the parsed response body
+///
+/// Configuration, sync runs, entity mappings, and reconciliation
+/// data are managed via corresponding Supabase tables.
 class FineractService {
   FineractService._();
 
@@ -61,6 +66,236 @@ class FineractService {
     }
   }
 
+  // ── Cloud Function Bridge ───────────────────────────────────────────
+
+  /// Calls the `fineractApi` Firebase callable function and returns the
+  /// response body. Automatically logs the access for auditing.
+  Future<Map<String, dynamic>> _callFunction(
+    String callName, {
+    Map<String, dynamic> variables = const {},
+  }) async {
+    final stopwatch = Stopwatch()..start();
+    try {
+      final callable = FirebaseFunctions.instance.httpsCallable('fineractApi');
+      final result = await callable.call<Map<String, dynamic>>({
+        'callName': callName,
+        'variables': variables,
+      });
+
+      stopwatch.stop();
+      final data = Map<String, dynamic>.from(result.data);
+
+      // Log access asynchronously — don't block the caller
+      _logAccessQuietly(
+        action: callName,
+        endpoint: callName,
+        httpMethod: _inferHttpMethod(callName),
+        httpStatusCode: data['statusCode'] as int? ?? 200,
+        responseTimeMs: stopwatch.elapsedMilliseconds,
+      );
+
+      return data;
+    } catch (e) {
+      stopwatch.stop();
+      _logAccessQuietly(
+        action: callName,
+        endpoint: callName,
+        httpMethod: _inferHttpMethod(callName),
+        httpStatusCode: 500,
+        responseTimeMs: stopwatch.elapsedMilliseconds,
+      );
+      return {
+        'statusCode': 500,
+        'error': e.toString(),
+      };
+    }
+  }
+
+  String _inferHttpMethod(String callName) {
+    if (callName.startsWith('fineractCreate') ||
+        callName.startsWith('fineractApprove') ||
+        callName.startsWith('fineractDisburse') ||
+        callName.startsWith('fineractMake')) {
+      return 'POST';
+    }
+    return 'GET';
+  }
+
+  // ── Fineract API Calls ──────────────────────────────────────────────
+
+  /// Fetch a paginated list of clients from Fineract.
+  Future<Map<String, dynamic>> getClients({
+    int? offset,
+    int? limit,
+    String? orderBy,
+  }) async {
+    return _callFunction('fineractGetClients', variables: {
+      'params': {
+        if (offset != null) 'offset': offset,
+        if (limit != null) 'limit': limit,
+        if (orderBy != null) 'orderBy': orderBy,
+      },
+    });
+  }
+
+  /// Fetch a single client by Fineract ID.
+  Future<Map<String, dynamic>> getClient(String clientId) async {
+    return _callFunction('fineractGetClient', variables: {
+      'clientId': clientId,
+    });
+  }
+
+  /// Create a new client in Fineract.
+  Future<Map<String, dynamic>> createClient(
+      Map<String, dynamic> clientData) async {
+    return _callFunction('fineractCreateClient', variables: {
+      'data': clientData,
+    });
+  }
+
+  /// Fetch a paginated list of loans from Fineract.
+  Future<Map<String, dynamic>> getLoans({
+    int? offset,
+    int? limit,
+    String? orderBy,
+  }) async {
+    return _callFunction('fineractGetLoans', variables: {
+      'params': {
+        if (offset != null) 'offset': offset,
+        if (limit != null) 'limit': limit,
+        if (orderBy != null) 'orderBy': orderBy,
+      },
+    });
+  }
+
+  /// Fetch a single loan with all associations by Fineract ID.
+  Future<Map<String, dynamic>> getLoan(
+    String loanId, {
+    String associations = 'all',
+  }) async {
+    return _callFunction('fineractGetLoan', variables: {
+      'loanId': loanId,
+      'associations': associations,
+    });
+  }
+
+  /// Create a new loan application in Fineract.
+  Future<Map<String, dynamic>> createLoan(
+      Map<String, dynamic> loanData) async {
+    return _callFunction('fineractCreateLoan', variables: {
+      'data': loanData,
+    });
+  }
+
+  /// Approve a pending loan in Fineract.
+  Future<Map<String, dynamic>> approveLoan(
+    String loanId, {
+    Map<String, dynamic> data = const {},
+  }) async {
+    return _callFunction('fineractApproveLoan', variables: {
+      'loanId': loanId,
+      'data': data,
+    });
+  }
+
+  /// Disburse an approved loan in Fineract.
+  Future<Map<String, dynamic>> disburseLoan(
+    String loanId, {
+    Map<String, dynamic> data = const {},
+  }) async {
+    return _callFunction('fineractDisburseLoan', variables: {
+      'loanId': loanId,
+      'data': data,
+    });
+  }
+
+  /// Record a repayment against a loan in Fineract.
+  Future<Map<String, dynamic>> makeRepayment(
+    String loanId,
+    Map<String, dynamic> repaymentData,
+  ) async {
+    return _callFunction('fineractMakeRepayment', variables: {
+      'loanId': loanId,
+      'data': repaymentData,
+    });
+  }
+
+  /// Fetch savings accounts from Fineract.
+  Future<Map<String, dynamic>> getSavingsAccounts({
+    int? offset,
+    int? limit,
+  }) async {
+    return _callFunction('fineractGetSavingsAccounts', variables: {
+      'params': {
+        if (offset != null) 'offset': offset,
+        if (limit != null) 'limit': limit,
+      },
+    });
+  }
+
+  /// Fetch all offices/branches from Fineract.
+  Future<Map<String, dynamic>> getOffices() async {
+    return _callFunction('fineractGetOffices');
+  }
+
+  /// Fetch staff members from Fineract.
+  Future<Map<String, dynamic>> getStaff({
+    int? officeId,
+    String? status,
+  }) async {
+    return _callFunction('fineractGetStaff', variables: {
+      'params': {
+        if (officeId != null) 'officeId': officeId,
+        if (status != null) 'status': status,
+      },
+    });
+  }
+
+  /// Fetch all loan products from Fineract.
+  Future<Map<String, dynamic>> getLoanProducts() async {
+    return _callFunction('fineractGetLoanProducts');
+  }
+
+  /// Fetch GL accounts from Fineract.
+  Future<Map<String, dynamic>> getGLAccounts({String? type}) async {
+    return _callFunction('fineractGetGLAccounts', variables: {
+      'params': {
+        if (type != null) 'type': type,
+      },
+    });
+  }
+
+  /// Fetch journal entries from Fineract.
+  Future<Map<String, dynamic>> getJournalEntries({
+    int? offset,
+    int? limit,
+    int? glAccountId,
+  }) async {
+    return _callFunction('fineractGetJournalEntries', variables: {
+      'params': {
+        if (offset != null) 'offset': offset,
+        if (limit != null) 'limit': limit,
+        if (glAccountId != null) 'glAccountId': glAccountId,
+      },
+    });
+  }
+
+  /// Search across Fineract entities.
+  Future<Map<String, dynamic>> search(
+    String query, {
+    String? resource,
+  }) async {
+    return _callFunction('fineractSearch', variables: {
+      'query': query,
+      if (resource != null) 'resource': resource,
+    });
+  }
+
+  /// Force-reload Fineract credentials from Firestore on the server side.
+  Future<Map<String, dynamic>> refreshServerConfig() async {
+    return _callFunction('fineractRefreshConfig');
+  }
+
   // ── Sync Runs ───────────────────────────────────────────────────────
 
   /// Creates a new sync run record and returns its ID.
@@ -79,8 +314,7 @@ class FineractService {
             'run_type': runType,
             'started_at': DateTime.now().toUtc().toIso8601String(),
             'status': 'running',
-            'entity_types':
-                entityTypes.map((e) => e.name).toList(),
+            'entity_types': entityTypes.map((e) => e.name).toList(),
             'triggered_by': triggeredBy,
           })
           .select('id')
@@ -117,7 +351,9 @@ class FineractService {
   }
 
   /// Fetches the most recent sync runs for display in the UI.
-  Future<List<Map<String, dynamic>>> getRecentSyncRuns({int limit = 20}) async {
+  Future<List<Map<String, dynamic>>> getRecentSyncRuns({
+    int limit = 20,
+  }) async {
     if (_integrationId == null) return [];
     return await _client
         .from('fineract_sync_runs')
@@ -137,7 +373,7 @@ class FineractService {
 
   // ── Entity Mappings ─────────────────────────────────────────────────
 
-  /// Looks up the local ID for a Fineract entity.
+  /// Looks up the local Supabase ID for a Fineract entity.
   Future<String?> getLocalId({
     required FineractEntityType entityType,
     required String fineractId,
@@ -151,6 +387,22 @@ class FineractService {
         .eq('fineract_id', fineractId)
         .maybeSingle();
     return response?['local_id'] as String?;
+  }
+
+  /// Looks up the Fineract ID for a local Supabase entity.
+  Future<String?> getFineractId({
+    required FineractEntityType entityType,
+    required String localId,
+  }) async {
+    if (_integrationId == null) return null;
+    final response = await _client
+        .from('fineract_entity_mappings')
+        .select('fineract_id')
+        .eq('integration_id', _integrationId!)
+        .eq('entity_type', entityType.name)
+        .eq('local_id', localId)
+        .maybeSingle();
+    return response?['fineract_id'] as String?;
   }
 
   /// Creates or updates an entity mapping between Fineract and local IDs.
@@ -181,28 +433,31 @@ class FineractService {
 
   // ── Access Logging ──────────────────────────────────────────────────
 
-  /// Logs a Fineract API access event for auditing.
-  Future<void> logAccess({
-    required String userId,
+  /// Logs a Fineract API access event, swallowing errors so it never
+  /// breaks the calling code.
+  void _logAccessQuietly({
     required String action,
-    String? userEmail,
-    String? resource,
     String? endpoint,
     String? httpMethod,
     int? httpStatusCode,
     int? responseTimeMs,
-  }) async {
-    await _client.from('fineract_access_log').insert({
-      'user_id': userId,
-      'action': action,
-      if (userEmail != null) 'user_email': userEmail,
-      if (resource != null) 'resource': resource,
-      if (endpoint != null) 'endpoint': endpoint,
-      if (httpMethod != null) 'http_method': httpMethod,
-      if (httpStatusCode != null) 'http_status_code': httpStatusCode,
-      if (responseTimeMs != null) 'response_time_ms': responseTimeMs,
-      'accessed_at': DateTime.now().toUtc().toIso8601String(),
-    });
+  }) {
+    try {
+      final uid = currentUserUid;
+      if (uid.isEmpty) return;
+      _client.from('fineract_access_log').insert({
+        'user_id': uid,
+        'action': action,
+        'user_email': currentUserEmail,
+        if (endpoint != null) 'endpoint': endpoint,
+        if (httpMethod != null) 'http_method': httpMethod,
+        if (httpStatusCode != null) 'http_status_code': httpStatusCode,
+        if (responseTimeMs != null) 'response_time_ms': responseTimeMs,
+        'accessed_at': DateTime.now().toUtc().toIso8601String(),
+      }).then((_) {}).catchError((_) {});
+    } catch (_) {
+      // Never throw from logging
+    }
   }
 
   // ── Reconciliation ─────────────────────────────────────────────────
@@ -221,9 +476,7 @@ class FineractService {
   // ── Integration Status ──────────────────────────────────────────────
 
   /// Updates the last sync timestamp and status on the integration record.
-  Future<void> updateSyncStatus({
-    required String status,
-  }) async {
+  Future<void> updateSyncStatus({required String status}) async {
     if (_integrationId == null) return;
     await _client.from('fineract_integrations').update({
       'last_sync_at': DateTime.now().toUtc().toIso8601String(),

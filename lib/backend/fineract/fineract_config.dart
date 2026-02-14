@@ -1,12 +1,14 @@
-/// Configuration for the Apache Fineract integration.
+/// Client-side configuration for the Apache Fineract integration.
 ///
-/// Credentials and base URL are stored in the `fineract_integrations`
-/// Supabase table and loaded at runtime so nothing is hard-coded.
+/// Loaded from the `fineract_integrations` Supabase table at runtime.
+/// Credentials (username/password) are stored server-side only —
+/// they live in the Firestore `config/fineract` document and are
+/// never sent to the Flutter client.
 class FineractConfig {
   final String baseUrl;
   final String tenantId;
-  final String username;
   final String environment;
+  final String? fineractVersion;
   final bool syncEnabled;
   final int syncIntervalMinutes;
   final bool syncClients;
@@ -21,8 +23,8 @@ class FineractConfig {
   const FineractConfig({
     required this.baseUrl,
     required this.tenantId,
-    required this.username,
     required this.environment,
+    this.fineractVersion,
     this.syncEnabled = false,
     this.syncIntervalMinutes = 30,
     this.syncClients = true,
@@ -39,8 +41,8 @@ class FineractConfig {
     return FineractConfig(
       baseUrl: row['base_url'] ?? '',
       tenantId: row['tenant_id'] ?? 'default',
-      username: row['auth_username'] ?? '',
       environment: row['environment'] ?? 'sandbox',
+      fineractVersion: row['fineract_version'],
       syncEnabled: row['sync_enabled'] ?? false,
       syncIntervalMinutes: row['sync_interval_minutes'] ?? 30,
       syncClients: row['sync_clients'] ?? true,

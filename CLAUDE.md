@@ -250,9 +250,9 @@ Flutter App (Dart)              Firebase Cloud Functions (Node.js)       Apache 
 └──────────────────┘
 ```
 
-- **Flutter side:** `FineractService` (`lib/backend/fineract/fineract_service.dart`) manages configuration, sync runs, entity mappings, and access logs via Supabase
-- **Cloud Functions side:** `fineract_client.js` provides an authenticated HTTP client for all Fineract REST endpoints. `fineract_handlers.js` maps call names to handler functions that are invoked via the `fineractApi` callable function
-- **Credentials** are stored in the `fineract_integrations` Supabase table (never hard-coded)
+- **Flutter side:** `FineractService` (`lib/backend/fineract/fineract_service.dart`) is a singleton that provides typed Dart methods for every Fineract operation. Each method calls the `fineractApi` Cloud Function via `cloud_functions` package, automatically logs access to `fineract_access_log`, and manages entity mappings / sync tracking via Supabase
+- **Cloud Functions side:** `fineract_client.js` provides an authenticated HTTP client for all Fineract REST endpoints. `fineract_handlers.js` loads credentials server-side from the Firestore `config/fineract` document (cached for 5 minutes) and maps call names to handler functions invoked via the `fineractApi` callable function
+- **Credentials** are stored **server-side only** in Firestore (`config/fineract` document with `baseUrl`, `tenantId`, `username`, `password`) — never sent to or stored on the client. The `fineract_integrations` Supabase table stores non-sensitive config (sync flags, environment, tenant ID) for the Flutter app
 
 ### Supported Fineract Operations
 
@@ -274,12 +274,60 @@ Flutter App (Dart)              Firebase Cloud Functions (Node.js)       Apache 
 | `fineractGetGLAccounts` | `GET /glaccounts` | List GL accounts |
 | `fineractGetJournalEntries` | `GET /journalentries` | List journal entries |
 | `fineractSearch` | `GET /search` | Global entity search |
+| `fineractRefreshConfig` | — | Reload server-side credentials from Firestore |
+
+### Calling Fineract from Flutter
+
+The `FineractService` provides typed Dart methods that map 1:1 to the operations above. Every call automatically logs access and measures response time:
+
+```dart
+final fineract = FineractService.instance;
+
+// Initialize — load sync config from Supabase
+await fineract.loadConfig();
+
+// Fetch paginated loans
+final loansResult = await fineract.getLoans(offset: 0, limit: 20);
+if (loansResult['statusCode'] == 200) {
+  final loans = loansResult['body'];
+}
+
+// Create a client
+final createResult = await fineract.createClient({
+  'firstname': 'John',
+  'lastname': 'Doe',
+  'officeId': 1,
+  'active': true,
+  'activationDate': '01 January 2026',
+  'dateFormat': 'dd MMMM yyyy',
+  'locale': 'en',
+});
+
+// Approve and disburse a loan
+await fineract.approveLoan('123', data: {
+  'approvedOnDate': '15 January 2026',
+  'dateFormat': 'dd MMMM yyyy',
+  'locale': 'en',
+});
+await fineract.disburseLoan('123');
+
+// Record a repayment
+await fineract.makeRepayment('123', {
+  'transactionDate': '01 February 2026',
+  'transactionAmount': 5000,
+  'dateFormat': 'dd MMMM yyyy',
+  'locale': 'en',
+});
+
+// Search across entities
+final searchResult = await fineract.search('John Doe');
+```
 
 ### Supabase Tables for Fineract
 
 | Table | Purpose |
 |-------|---------|
-| `fineract_integrations` | Connection config (URL, tenant, credentials, sync flags) |
+| `fineract_integrations` | Non-sensitive config (URL, tenant, sync flags — no passwords) |
 | `fineract_sync_runs` | History of sync executions with record counts |
 | `fineract_sync_items` | Individual entity records processed during sync |
 | `fineract_entity_mappings` | Maps Fineract IDs to local Supabase IDs |
