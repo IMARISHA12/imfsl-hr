@@ -1186,6 +1186,7 @@ LEFT JOIN public.leave_balances lb
 CREATE OR REPLACE VIEW public.v_attendance_dashboard AS
 SELECT
   ar.id,
+  ar.staff_id,
   s.full_name AS staff_name,
   s.department,
   ar.work_date,

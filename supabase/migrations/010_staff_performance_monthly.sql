@@ -150,7 +150,7 @@ BEGIN
   FROM public.employees WHERE dept IS NOT NULL;
 
   -- Latest payroll cost
-  SELECT coalesce(total_net_salary, 0) INTO v_monthly_payroll
+  SELECT coalesce(total_cost, 0) INTO v_monthly_payroll
   FROM public.payroll_runs
   WHERE status IN ('approved', 'paid')
   ORDER BY run_period_year DESC, run_period_month DESC

@@ -13,8 +13,11 @@ class HrService {
 
   SupabaseClient get _client => SupaFlow.client;
 
-  static const _functionsBase =
-      'https://lzyixazjquouicfsfzzu.supabase.co/functions/v1';
+  /// Derive edge-function base URL from the project URL used by SupaFlow.
+  static String get _functionsBase {
+    final projectUrl = SupaFlow.client.rest.url.replaceAll('/rest/v1', '');
+    return '$projectUrl/functions/v1';
+  }
 
   // ──────────────────────────────────────────────
   //  PAYROLL
