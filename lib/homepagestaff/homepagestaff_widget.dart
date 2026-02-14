@@ -143,7 +143,7 @@ class _HomepagestaffWidgetState extends State<HomepagestaffWidget> {
                                           : null;
 
                                   return Text(
-                                    'Habari, Sarah',
+                                    'Habari, ${textStaffRow?.fullName ?? 'Mfanyakazi'}',
                                     style: FlutterFlowTheme.of(context)
                                         .headlineMedium
                                         .override(
@@ -564,7 +564,12 @@ class _HomepagestaffWidgetState extends State<HomepagestaffWidget> {
                                               snapshot.data!;
 
                                           return Text(
-                                            '3',
+                                            valueOrDefault<String>(
+                                              textAttendanceRecordsRowList
+                                                  .length
+                                                  .toString(),
+                                              '0',
+                                            ),
                                             style: FlutterFlowTheme.of(context)
                                                 .displaySmall
                                                 .override(
@@ -817,7 +822,7 @@ class _HomepagestaffWidgetState extends State<HomepagestaffWidget> {
                                                   : null;
 
                                           return Text(
-                                            '${textStaffPerformanceRow?.ptpSuccessRate.toString()}%',
+                                            '${textStaffPerformanceRow?.ptpSuccessRate?.toStringAsFixed(0) ?? '0'}%',
                                             style: FlutterFlowTheme.of(context)
                                                 .displaySmall
                                                 .override(
