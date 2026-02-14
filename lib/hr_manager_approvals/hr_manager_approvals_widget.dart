@@ -47,6 +47,11 @@ class _HrManagerApprovalsWidgetState extends State<HrManagerApprovalsWidget> {
       _model.isLoading = false;
     } catch (e) {
       _model.isLoading = false;
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Hitilafu kupakia maombi: $e')),
+        );
+      }
     }
     safeSetState(() {});
   }

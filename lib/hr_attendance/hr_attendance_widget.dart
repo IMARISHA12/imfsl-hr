@@ -87,6 +87,11 @@ class _HrAttendanceWidgetState extends State<HrAttendanceWidget> {
       _model.isLoading = false;
     } catch (e) {
       _model.isLoading = false;
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Hitilafu kupakia data: $e')),
+        );
+      }
     }
     safeSetState(() {});
   }

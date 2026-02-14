@@ -54,6 +54,11 @@ class _HrProfileWidgetState extends State<HrProfileWidget> {
       _model.isLoading = false;
     } catch (e) {
       _model.isLoading = false;
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Hitilafu kupakia wasifu: $e')),
+        );
+      }
     }
     safeSetState(() {});
   }

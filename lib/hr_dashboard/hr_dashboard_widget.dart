@@ -84,25 +84,80 @@ class _HrDashboardWidgetState extends State<HrDashboardWidget> {
                     ),
                   ),
                 )
-              : RefreshIndicator(
-                  onRefresh: _loadDashboardData,
-                  child: SingleChildScrollView(
-                    physics: const AlwaysScrollableScrollPhysics(),
-                    child: Padding(
-                      padding: const EdgeInsets.all(20.0),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          _buildHeader(context),
-                          const SizedBox(height: 20.0),
-                          _buildKpiCards(context),
-                          const SizedBox(height: 20.0),
-                          _buildAlerts(context),
-                          const SizedBox(height: 20.0),
-                          _buildQuickActions(context),
-                        ],
+              : _model.errorMessage != null
+                  ? Center(
+                      child: Padding(
+                        padding: const EdgeInsets.all(32.0),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Icon(Icons.cloud_off,
+                                size: 64.0, color: Color(0xFF9CA3AF)),
+                            const SizedBox(height: 16.0),
+                            Text(
+                              'Hitilafu kupakia data',
+                              style: FlutterFlowTheme.of(context)
+                                  .titleMedium
+                                  .override(
+                                    font: GoogleFonts.interTight(
+                                        fontWeight: FontWeight.w600),
+                                    letterSpacing: 0.0,
+                                  ),
+                            ),
+                            const SizedBox(height: 8.0),
+                            Text(
+                              _model.errorMessage!,
+                              textAlign: TextAlign.center,
+                              style: FlutterFlowTheme.of(context)
+                                  .bodySmall
+                                  .override(
+                                    font: GoogleFonts.inter(),
+                                    color: FlutterFlowTheme.of(context)
+                                        .secondaryText,
+                                    letterSpacing: 0.0,
+                                  ),
+                            ),
+                            const SizedBox(height: 24.0),
+                            FFButtonWidget(
+                              onPressed: () {
+                                _model.isLoading = true;
+                                _model.errorMessage = null;
+                                safeSetState(() {});
+                                _loadDashboardData();
+                              },
+                              text: 'Jaribu tena',
+                              options: FFButtonOptions(
+                                height: 44.0,
+                                color: const Color(0xFF1E3A8A),
+                                textStyle: GoogleFonts.inter(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.w600),
+                                borderRadius: BorderRadius.circular(10.0),
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
+                    )
+                  : RefreshIndicator(
+                      onRefresh: _loadDashboardData,
+                      child: SingleChildScrollView(
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        child: Padding(
+                          padding: const EdgeInsets.all(20.0),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              _buildHeader(context),
+                              const SizedBox(height: 20.0),
+                              _buildKpiCards(context),
+                              const SizedBox(height: 20.0),
+                              _buildAlerts(context),
+                              const SizedBox(height: 20.0),
+                              _buildQuickActions(context),
+                            ],
+                          ),
+                        ),
                   ),
                 ),
         ),
