@@ -458,9 +458,10 @@ GRANT SELECT ON public.v_repayment_history TO service_role, authenticated;
 -- │   1. 006_fineract_integration.sql  (Fineract core banking integration)│
 -- │   2. 007_hr_business_logic.sql     (Payroll, Leave, Attendance, Perf.)│
 -- │   3. 008_scheduled_tasks.sql       (Cron jobs, arrears, leave accrual)│
+-- │   4. 009_rls_policies_and_integration.sql (RLS, notifications, audit)│
 -- │                                                                        │
 -- │ After migrations, run seed data:                                       │
--- │   4. seed/003_hr_master_data.sql   (Tax brackets, deductions, leaves) │
+-- │   5. seed/003_hr_master_data.sql   (Tax brackets, deductions, leaves) │
 -- │                                                                        │
 -- │ These are too large for a single SQL Editor run.                       │
 -- └─────────────────────────────────────────────────────────────────────────┘
