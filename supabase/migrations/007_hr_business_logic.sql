@@ -1286,29 +1286,50 @@ JOIN public.employees e ON e.id = pr.employee_id;
 CREATE OR REPLACE FUNCTION public.rpc_hr_dashboard_kpis()
 RETURNS jsonb LANGUAGE plpgsql STABLE SECURITY DEFINER AS $$
 DECLARE
+  v_total_staff int;
+  v_present int;
+  v_work_days int;
+  v_rate numeric;
   v_result jsonb;
 BEGIN
+  -- Calculate attendance rate for this month
+  v_total_staff := (SELECT count(*) FROM public.staff WHERE active = true);
+  v_present := (SELECT count(DISTINCT staff_id) FROM public.attendance_records
+    WHERE work_date >= date_trunc('month', current_date) AND clock_in IS NOT NULL);
+  v_work_days := GREATEST(1, EXTRACT(DAY FROM current_date)::int);
+  v_rate := CASE WHEN v_total_staff > 0
+    THEN round((v_present::numeric / (v_total_staff * v_work_days)) * 100, 0)
+    ELSE 0 END;
+
   SELECT jsonb_build_object(
-    -- Headcount
-    'total_employees', (SELECT count(*) FROM public.employees WHERE status = 'active' OR employment_status = 'active'),
-    'total_staff', (SELECT count(*) FROM public.staff WHERE active = true),
-    'departments', (SELECT count(DISTINCT dept) FROM public.employees WHERE dept IS NOT NULL),
-    'new_hires_this_month', (SELECT count(*) FROM public.employees WHERE hire_date >= date_trunc('month', current_date)),
-    'contracts_expiring_30d', (SELECT count(*) FROM public.employees WHERE contract_end_date BETWEEN current_date AND current_date + interval '30 days'),
-    -- Attendance (today)
-    'present_today', (SELECT count(*) FROM public.attendance_records WHERE work_date = current_date AND clock_in IS NOT NULL),
-    'late_today', (SELECT count(*) FROM public.attendance_records WHERE work_date = current_date AND is_late = true),
-    'clocked_out_today', (SELECT count(*) FROM public.attendance_records WHERE work_date = current_date AND clock_out IS NOT NULL),
-    -- Leave
-    'pending_leave_requests', (SELECT count(*) FROM public.leave_requests WHERE status = 'pending'),
-    'on_leave_today', (SELECT count(*) FROM public.leave_requests WHERE status = 'approved' AND current_date BETWEEN start_date AND end_date),
-    -- Payroll
-    'latest_payroll_status', (SELECT status FROM public.payroll_runs ORDER BY run_date DESC LIMIT 1),
-    'latest_payroll_cost', (SELECT total_cost FROM public.payroll_runs ORDER BY run_date DESC LIMIT 1),
-    -- Performance
-    'active_review_cycles', (SELECT count(*) FROM public.performance_review_cycles WHERE status IN ('active', 'in_review')),
-    'pending_reviews', (SELECT count(*) FROM public.performance_reviews WHERE status IN ('pending', 'self_review', 'manager_review')),
-    'avg_performance_score', (SELECT round(avg(overall_score), 2) FROM public.performance_reviews WHERE overall_score IS NOT NULL)
+    'headcount', jsonb_build_object(
+      'active', (SELECT count(*) FROM public.employees WHERE status = 'active' OR employment_status = 'active'),
+      'total_staff', v_total_staff,
+      'departments', (SELECT count(DISTINCT dept) FROM public.employees WHERE dept IS NOT NULL),
+      'new_hires_this_month', (SELECT count(*) FROM public.employees WHERE hire_date >= date_trunc('month', current_date))
+    ),
+    'payroll', jsonb_build_object(
+      'monthly_cost', (SELECT total_cost FROM public.payroll_runs ORDER BY run_date DESC LIMIT 1),
+      'avg_salary', (SELECT round(avg(basic_salary), 0) FROM public.salary_structures WHERE is_current = true),
+      'status', (SELECT status FROM public.payroll_runs ORDER BY run_date DESC LIMIT 1)
+    ),
+    'attendance', jsonb_build_object(
+      'present_today', (SELECT count(*) FROM public.attendance_records WHERE work_date = current_date AND clock_in IS NOT NULL),
+      'late_today', (SELECT count(*) FROM public.attendance_records WHERE work_date = current_date AND is_late = true),
+      'rate_this_month', v_rate
+    ),
+    'leave', jsonb_build_object(
+      'pending_requests', (SELECT count(*) FROM public.leave_requests WHERE status = 'pending'),
+      'on_leave_today', (SELECT count(*) FROM public.leave_requests WHERE status = 'approved' AND current_date BETWEEN start_date AND end_date)
+    ),
+    'performance', jsonb_build_object(
+      'avg_score', (SELECT round(avg(overall_score), 1) FROM public.performance_reviews WHERE overall_score IS NOT NULL),
+      'pending_reviews', (SELECT count(*) FROM public.performance_reviews WHERE status IN ('pending', 'self_review', 'manager_review')),
+      'active_cycles', (SELECT count(*) FROM public.performance_review_cycles WHERE status IN ('active', 'in_review'))
+    ),
+    'alerts', jsonb_build_object(
+      'expiring_contracts', (SELECT count(*) FROM public.employees WHERE contract_end_date BETWEEN current_date AND current_date + interval '30 days')
+    )
   ) INTO v_result;
 
   RETURN v_result;

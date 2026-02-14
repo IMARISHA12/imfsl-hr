@@ -32,49 +32,64 @@ class PerformanceReviewsRow extends SupabaseDataRow {
   set status(String value) => setField<String>('status', value);
 
   // Self-assessment scores
-  int? get selfQuality => getField<int>('self_quality');
-  set selfQuality(int? value) => setField<int>('self_quality', value);
+  int? get selfQuality => getField<int>('self_score_quality');
+  set selfQuality(int? value) => setField<int>('self_score_quality', value);
 
-  int? get selfProductivity => getField<int>('self_productivity');
+  int? get selfProductivity => getField<int>('self_score_productivity');
   set selfProductivity(int? value) =>
-      setField<int>('self_productivity', value);
+      setField<int>('self_score_productivity', value);
 
-  int? get selfTeamwork => getField<int>('self_teamwork');
-  set selfTeamwork(int? value) => setField<int>('self_teamwork', value);
+  int? get selfTeamwork => getField<int>('self_score_teamwork');
+  set selfTeamwork(int? value) => setField<int>('self_score_teamwork', value);
 
-  int? get selfInitiative => getField<int>('self_initiative');
-  set selfInitiative(int? value) => setField<int>('self_initiative', value);
+  int? get selfInitiative => getField<int>('self_score_initiative');
+  set selfInitiative(int? value) => setField<int>('self_score_initiative', value);
 
-  int? get selfAttendance => getField<int>('self_attendance');
-  set selfAttendance(int? value) => setField<int>('self_attendance', value);
+  int? get selfAttendance => getField<int>('self_score_attendance');
+  set selfAttendance(int? value) => setField<int>('self_score_attendance', value);
 
   String? get selfComments => getField<String>('self_comments');
   set selfComments(String? value) =>
       setField<String>('self_comments', value);
 
   // Manager assessment scores
-  int? get mgrQuality => getField<int>('mgr_quality');
-  set mgrQuality(int? value) => setField<int>('mgr_quality', value);
+  int? get mgrQuality => getField<int>('mgr_score_quality');
+  set mgrQuality(int? value) => setField<int>('mgr_score_quality', value);
 
-  int? get mgrProductivity => getField<int>('mgr_productivity');
+  int? get mgrProductivity => getField<int>('mgr_score_productivity');
   set mgrProductivity(int? value) =>
-      setField<int>('mgr_productivity', value);
+      setField<int>('mgr_score_productivity', value);
 
-  int? get mgrTeamwork => getField<int>('mgr_teamwork');
-  set mgrTeamwork(int? value) => setField<int>('mgr_teamwork', value);
+  int? get mgrTeamwork => getField<int>('mgr_score_teamwork');
+  set mgrTeamwork(int? value) => setField<int>('mgr_score_teamwork', value);
 
-  int? get mgrInitiative => getField<int>('mgr_initiative');
-  set mgrInitiative(int? value) => setField<int>('mgr_initiative', value);
+  int? get mgrInitiative => getField<int>('mgr_score_initiative');
+  set mgrInitiative(int? value) => setField<int>('mgr_score_initiative', value);
 
-  int? get mgrAttendance => getField<int>('mgr_attendance');
-  set mgrAttendance(int? value) => setField<int>('mgr_attendance', value);
+  int? get mgrAttendance => getField<int>('mgr_score_attendance');
+  set mgrAttendance(int? value) => setField<int>('mgr_score_attendance', value);
 
   String? get mgrComments => getField<String>('mgr_comments');
   set mgrComments(String? value) => setField<String>('mgr_comments', value);
 
-  // KPI scores (loan officers)
-  int? get kpiScore => getField<int>('kpi_score');
-  set kpiScore(int? value) => setField<int>('kpi_score', value);
+  // KPI-based scores (auto-calculated for loan officers)
+  double? get kpiDisbursementScore =>
+      getField<double>('kpi_disbursement_score');
+  set kpiDisbursementScore(double? value) =>
+      setField<double>('kpi_disbursement_score', value);
+
+  double? get kpiCollectionScore => getField<double>('kpi_collection_score');
+  set kpiCollectionScore(double? value) =>
+      setField<double>('kpi_collection_score', value);
+
+  double? get kpiParScore => getField<double>('kpi_par_score');
+  set kpiParScore(double? value) =>
+      setField<double>('kpi_par_score', value);
+
+  double? get kpiClientGrowthScore =>
+      getField<double>('kpi_client_growth_score');
+  set kpiClientGrowthScore(double? value) =>
+      setField<double>('kpi_client_growth_score', value);
 
   // Overall
   double? get overallScore => getField<double>('overall_score');
@@ -92,6 +107,14 @@ class PerformanceReviewsRow extends SupabaseDataRow {
   String? get developmentPlan => getField<String>('development_plan');
   set developmentPlan(String? value) =>
       setField<String>('development_plan', value);
+
+  DateTime? get submittedAt => getField<DateTime>('submitted_at');
+  set submittedAt(DateTime? value) =>
+      setField<DateTime>('submitted_at', value);
+
+  DateTime? get reviewedAt => getField<DateTime>('reviewed_at');
+  set reviewedAt(DateTime? value) =>
+      setField<DateTime>('reviewed_at', value);
 
   DateTime get createdAt => getField<DateTime>('created_at')!;
   set createdAt(DateTime value) => setField<DateTime>('created_at', value);

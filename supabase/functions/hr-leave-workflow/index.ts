@@ -175,19 +175,16 @@ Deno.serve(async (req: Request) => {
           return jsonResponse({ error: "Missing start_date and end_date" }, 400);
         }
 
+        // Use v_leave_dashboard view which properly joins employees via user_id
         let query = supabase
-          .from("leave_requests")
-          .select(`
-            id, user_id, start_date, end_date, days_count, status, reason,
-            leave_types!inner(leave_type),
-            employees!inner(full_name, dept, employee_code)
-          `)
+          .from("v_leave_dashboard")
+          .select("request_id, employee_name, employee_code, department, leave_type, start_date, end_date, days_count, status, reason")
           .eq("status", "approved")
           .gte("end_date", body.start_date)
           .lte("start_date", body.end_date);
 
         if (body.department) {
-          query = query.eq("employees.dept", body.department);
+          query = query.eq("department", body.department);
         }
 
         const { data, error } = await query;
