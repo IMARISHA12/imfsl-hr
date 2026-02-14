@@ -439,7 +439,9 @@ class _HrLeaveWidgetState extends State<HrLeaveWidget>
                   _model.endDate = null;
                   _model.reasonController?.clear();
 
+                  if (!mounted) return;
                   await _loadData();
+                  if (!mounted) return;
                   _tabController.animateTo(1); // switch to requests tab
 
                   if (context.mounted) {

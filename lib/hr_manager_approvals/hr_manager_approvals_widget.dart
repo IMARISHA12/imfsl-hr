@@ -118,9 +118,8 @@ class _HrManagerApprovalsWidgetState extends State<HrManagerApprovalsWidget> {
   }
 
   Widget _buildRequestCard(BuildContext context, Map<String, dynamic> req) {
-    final leaveType =
-        (req['leave_types'] as Map<String, dynamic>?)?['leave_type'] ?? '';
-    final employeeName = req['employee_name'] ?? req['user_id'] ?? 'N/A';
+    final leaveType = req['leave_type'] ?? '';
+    final employeeName = req['employee_name'] ?? 'N/A';
     final startDate = req['start_date'] ?? '';
     final endDate = req['end_date'] ?? '';
     final days = req['days_count'] ?? '';
@@ -303,7 +302,7 @@ class _HrManagerApprovalsWidgetState extends State<HrManagerApprovalsWidget> {
               try {
                 final edgeFnBody = {
                   'operation': action,
-                  'request_id': req['id'],
+                  'request_id': req['request_id'],
                   'manager_comment': _model.commentController?.text ?? '',
                   'processed_by': currentUserEmail,
                 };

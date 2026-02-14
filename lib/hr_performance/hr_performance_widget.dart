@@ -339,6 +339,7 @@ class _HrPerformanceWidgetState extends State<HrPerformanceWidget>
                           comments: _model.commentsController?.text,
                         );
                         if (ctx.mounted) Navigator.pop(ctx);
+                        if (!mounted) return;
                         await _loadData();
                         if (context.mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(

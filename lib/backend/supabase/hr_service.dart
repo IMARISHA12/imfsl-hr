@@ -13,9 +13,6 @@ class HrService {
 
   SupabaseClient get _client => SupaFlow.client;
 
-  /// Edge-function base URL derived from the project URL in SupaFlow.
-  static String get _functionsBase => '${SupaFlow.supabaseUrl}/functions/v1';
-
   // ──────────────────────────────────────────────
   //  PAYROLL
   // ──────────────────────────────────────────────
@@ -97,12 +94,13 @@ class HrService {
   }
 
   /// Get all pending leave requests (for managers).
+  /// Uses v_leave_dashboard which includes employee name and balance info.
   Future<List<Map<String, dynamic>>> getPendingLeaveRequests() async {
     final res = await _client
-        .from('leave_requests')
-        .select('*, leave_types!inner(leave_type)')
+        .from('v_leave_dashboard')
+        .select()
         .eq('status', 'pending')
-        .order('created_at', ascending: false);
+        .order('requested_at', ascending: false);
     return List<Map<String, dynamic>>.from(res);
   }
 
