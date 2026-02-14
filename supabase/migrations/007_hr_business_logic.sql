@@ -89,6 +89,7 @@ CREATE TABLE IF NOT EXISTS public.payroll_runs (
   total_net numeric NOT NULL DEFAULT 0,
   total_cost numeric NOT NULL DEFAULT 0,         -- gross + employer contributions
   employee_count int NOT NULL DEFAULT 0,
+  bank_export_format text,                       -- CRDB/NMB/NBC CSV format identifier
   notes text,
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now(),

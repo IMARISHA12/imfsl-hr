@@ -12,7 +12,7 @@
  * Authentication: service role JWT or authorized user
  */
 
-import { corsHeaders } from "../_shared/cors.ts";
+import { corsHeaders, jsonResponse } from "../_shared/cors.ts";
 import { getServiceClient } from "../_shared/supabase-client.ts";
 
 const FUNCTION_NAME = "hr-attendance";
@@ -212,9 +212,3 @@ Deno.serve(async (req: Request) => {
   }
 });
 
-function jsonResponse(data: unknown, status = 200): Response {
-  return new Response(JSON.stringify(data), {
-    status,
-    headers: { ...corsHeaders, "Content-Type": "application/json" },
-  });
-}

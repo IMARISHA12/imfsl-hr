@@ -455,14 +455,13 @@ GRANT SELECT ON public.v_repayment_history TO service_role, authenticated;
 -- │ NOTE: Migrations 006–008 must be run from their individual files       │
 -- │                                                                        │
 -- │ Run in order:                                                          │
--- │   1. 006_fineract_integration.sql  (Fineract core banking integration)│
--- │   2. 007_hr_business_logic.sql     (Payroll, Leave, Attendance, Perf.)│
--- │   3. 008_scheduled_tasks.sql       (Cron jobs, arrears, leave accrual)│
--- │   4. 009_rls_policies_and_integration.sql (RLS, notifications, audit)│
--- │   5. 010_staff_performance_monthly.sql (KPI snapshots, dashboard fn)│
--- │                                                                        │
--- │ After migrations, run seed data:                                       │
--- │   6. seed/003_hr_master_data.sql   (Tax brackets, deductions, leaves) │
+-- │   1. 006_fineract_integration.sql   (Fineract core banking integration)│
+-- │   2. 006b_hr_prerequisite_tables.sql (leave_types, leave_requests,    │
+-- │      leave_balances, attendance_records + Tanzania leave type seeds)   │
+-- │   3. 007_hr_business_logic.sql      (Payroll, Leave, Attendance, Perf.)│
+-- │   4. 008_scheduled_tasks.sql        (Cron jobs, arrears, leave accrual)│
+-- │   5. 009_rls_policies_and_integration.sql (RLS, notifications, audit) │
+-- │   6. 010_staff_performance_monthly.sql (KPI snapshots, dashboard fn)  │
 -- │                                                                        │
 -- │ These are too large for a single SQL Editor run.                       │
 -- └─────────────────────────────────────────────────────────────────────────┘
