@@ -452,6 +452,13 @@ GRANT SELECT ON public.v_loan_details TO service_role, authenticated;
 GRANT SELECT ON public.v_repayment_history TO service_role, authenticated;
 
 -- ┌─────────────────────────────────────────────────────────────────────────┐
+-- │ NOTE: Migrations 006 & 007 must be run from their individual files     │
+-- │ - 006_fineract_integration.sql  (Fineract core banking integration)   │
+-- │ - 007_hr_business_logic.sql     (Payroll, Leave, Attendance, Perf.)   │
+-- │ These are too large for a single SQL Editor run.                       │
+-- └─────────────────────────────────────────────────────────────────────────┘
+
+-- ┌─────────────────────────────────────────────────────────────────────────┐
 -- │ VERIFICATION                                                            │
 -- └─────────────────────────────────────────────────────────────────────────┘
 
@@ -460,15 +467,21 @@ DECLARE
   tbl_count int;
   idx_count int;
   trg_count int;
+  view_count int;
+  fn_count int;
 BEGIN
   SELECT count(*) INTO tbl_count FROM information_schema.tables WHERE table_schema = 'public';
   SELECT count(*) INTO idx_count FROM pg_indexes WHERE schemaname = 'public' AND indexname LIKE 'idx_%';
   SELECT count(*) INTO trg_count FROM pg_trigger WHERE tgname LIKE 'trg_%';
+  SELECT count(*) INTO view_count FROM information_schema.views WHERE table_schema = 'public' AND table_name LIKE 'v_%';
+  SELECT count(*) INTO fn_count FROM information_schema.routines WHERE routine_schema = 'public' AND routine_name LIKE 'rpc_%';
 
   RAISE NOTICE '========================================';
   RAISE NOTICE 'MIGRATION COMPLETE';
   RAISE NOTICE 'Tables remaining: %', tbl_count;
   RAISE NOTICE 'Custom indexes: %', idx_count;
   RAISE NOTICE 'Normalization triggers: %', trg_count;
+  RAISE NOTICE 'Retool views: %', view_count;
+  RAISE NOTICE 'RPC functions: %', fn_count;
   RAISE NOTICE '========================================';
 END $$;
