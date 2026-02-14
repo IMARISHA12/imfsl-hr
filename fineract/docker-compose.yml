@@ -1,0 +1,92 @@
+# ============================================================================
+# Apache Fineract — Docker Compose Deployment
+#
+# This deploys Apache Fineract with:
+#   - Fineract Server (backend API)
+#   - MySQL/MariaDB (Fineract database)
+#   - Fineract Web App (optional admin UI)
+#
+# Usage:
+#   docker-compose up -d
+#   # Wait ~60 seconds for initialization
+#   # API: http://localhost:8443/fineract-provider/api/v1
+#   # Web: http://localhost:9090 (admin UI)
+#
+# Default credentials:
+#   Username: mifos
+#   Password: password
+#   Tenant:   default
+# ============================================================================
+
+version: '3.8'
+
+services:
+  # ── MySQL Database ──────────────────────────────────────────────────
+  fineract-db:
+    image: mariadb:10.11
+    container_name: fineract-db
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-mysql}
+      MYSQL_DATABASE: fineract_tenants
+      MYSQL_USER: ${MYSQL_USER:-root}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-mysql}
+    volumes:
+      - fineract-db-data:/var/lib/mysql
+    ports:
+      - "3306:3306"
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  # ── Apache Fineract Server ──────────────────────────────────────────
+  fineract-server:
+    image: apache/fineract:latest
+    container_name: fineract-server
+    restart: unless-stopped
+    depends_on:
+      fineract-db:
+        condition: service_healthy
+    environment:
+      # Database configuration
+      FINERACT_HIKARI_JDBC_URL: jdbc:mariadb://fineract-db:3306/fineract_tenants
+      FINERACT_HIKARI_USERNAME: ${MYSQL_USER:-root}
+      FINERACT_HIKARI_PASSWORD: ${MYSQL_PASSWORD:-mysql}
+      FINERACT_DEFAULT_TENANTDB_HOSTNAME: fineract-db
+      FINERACT_DEFAULT_TENANTDB_PORT: "3306"
+      FINERACT_DEFAULT_TENANTDB_UID: ${MYSQL_USER:-root}
+      FINERACT_DEFAULT_TENANTDB_PWD: ${MYSQL_PASSWORD:-mysql}
+      FINERACT_DEFAULT_TENANTDB_NAME: fineract_default
+      # Server configuration
+      JAVA_TOOL_OPTIONS: "-Xmx1G"
+      FINERACT_NODE_ID: "1"
+      # Security
+      FINERACT_SECURITY_BASICAUTH_ENABLED: "true"
+      FINERACT_SECURITY_OAUTH_ENABLED: "false"
+    ports:
+      - "8443:8443"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "-k", "https://localhost:8443/fineract-provider/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      start_period: 120s
+
+  # ── Fineract Web App (Admin UI) ─────────────────────────────────────
+  fineract-web:
+    image: openmf/web-app:latest
+    container_name: fineract-web
+    restart: unless-stopped
+    depends_on:
+      fineract-server:
+        condition: service_healthy
+    environment:
+      FINERACT_API_URL: https://fineract-server:8443
+    ports:
+      - "9090:80"
+
+volumes:
+  fineract-db-data:
+    driver: local
