@@ -72,7 +72,30 @@ CREATE TABLE IF NOT EXISTS public.salary_structures (
 CREATE UNIQUE INDEX IF NOT EXISTS idx_salary_structures_current
   ON public.salary_structures (employee_id) WHERE is_current = true;
 
--- A4. Payslips (one per employee per payroll run)
+-- A4a. Payroll runs (one per month, groups all payslips)
+CREATE TABLE IF NOT EXISTS public.payroll_runs (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  run_period_month int NOT NULL CHECK (run_period_month BETWEEN 1 AND 12),
+  run_period_year int NOT NULL CHECK (run_period_year >= 2020),
+  month text NOT NULL,                           -- display label e.g. "February 2026"
+  status text NOT NULL DEFAULT 'draft'
+    CHECK (status IN ('draft','submitted','approved','paid','cancelled')),
+  run_date date NOT NULL DEFAULT current_date,
+  prepared_by text,
+  approved_by text,
+  approved_at timestamptz,
+  total_gross numeric NOT NULL DEFAULT 0,
+  total_deductions numeric NOT NULL DEFAULT 0,
+  total_net numeric NOT NULL DEFAULT 0,
+  total_cost numeric NOT NULL DEFAULT 0,         -- gross + employer contributions
+  employee_count int NOT NULL DEFAULT 0,
+  notes text,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (run_period_month, run_period_year)
+);
+
+-- A4b. Payslips (one per employee per payroll run)
 CREATE TABLE IF NOT EXISTS public.payslips (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   payroll_run_id uuid NOT NULL REFERENCES public.payroll_runs(id) ON DELETE CASCADE,

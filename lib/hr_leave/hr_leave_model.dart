@@ -15,6 +15,9 @@ class HrLeaveModel extends FlutterFlowModel<HrLeaveWidget> {
   /// Loading state.
   bool isLoading = true;
 
+  /// Prevents double-tap on submit/cancel buttons.
+  bool isSubmitting = false;
+
   /// New request form controllers.
   TextEditingController? reasonController;
   String? selectedLeaveTypeId;

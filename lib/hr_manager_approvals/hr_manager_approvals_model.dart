@@ -10,6 +10,9 @@ class HrManagerApprovalsModel
   /// Loading state.
   bool isLoading = true;
 
+  /// Prevents double-tap on approve/reject buttons.
+  bool isSubmitting = false;
+
   /// Comment controller for approval/rejection.
   TextEditingController? commentController;
 

@@ -138,17 +138,31 @@ class _HrLeaveWidgetState extends State<HrLeaveWidget>
 
   Widget _buildBalancesTab(BuildContext context) {
     if (_model.balances.isEmpty) {
-      return Center(
-        child: Text(
-          'Hakuna salio la likizo lililopatikana',
-          style: FlutterFlowTheme.of(context).bodyMedium,
+      return RefreshIndicator(
+        onRefresh: _loadData,
+        child: ListView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          children: [
+            SizedBox(
+              height: MediaQuery.of(context).size.height * 0.5,
+              child: Center(
+                child: Text(
+                  'Hakuna salio la likizo lililopatikana',
+                  style: FlutterFlowTheme.of(context).bodyMedium,
+                ),
+              ),
+            ),
+          ],
         ),
       );
     }
 
-    return ListView.builder(
-      padding: const EdgeInsets.all(16.0),
-      itemCount: _model.balances.length,
+    return RefreshIndicator(
+      onRefresh: _loadData,
+      child: ListView.builder(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.all(16.0),
+        itemCount: _model.balances.length,
       itemBuilder: (context, index) {
         final b = _model.balances[index];
         final leaveType =
@@ -204,6 +218,7 @@ class _HrLeaveWidgetState extends State<HrLeaveWidget>
           ),
         );
       },
+      ),
     );
   }
 
@@ -224,17 +239,31 @@ class _HrLeaveWidgetState extends State<HrLeaveWidget>
 
   Widget _buildRequestsTab(BuildContext context) {
     if (_model.requests.isEmpty) {
-      return Center(
-        child: Text(
-          'Hakuna maombi ya likizo',
-          style: FlutterFlowTheme.of(context).bodyMedium,
+      return RefreshIndicator(
+        onRefresh: _loadData,
+        child: ListView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          children: [
+            SizedBox(
+              height: MediaQuery.of(context).size.height * 0.5,
+              child: Center(
+                child: Text(
+                  'Hakuna maombi ya likizo',
+                  style: FlutterFlowTheme.of(context).bodyMedium,
+                ),
+              ),
+            ),
+          ],
         ),
       );
     }
 
-    return ListView.builder(
-      padding: const EdgeInsets.all(16.0),
-      itemCount: _model.requests.length,
+    return RefreshIndicator(
+      onRefresh: _loadData,
+      child: ListView.builder(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.all(16.0),
+        itemCount: _model.requests.length,
       itemBuilder: (context, index) {
         final r = _model.requests[index];
         final leaveType =
@@ -342,6 +371,7 @@ class _HrLeaveWidgetState extends State<HrLeaveWidget>
           ),
         );
       },
+      ),
     );
   }
 
@@ -418,54 +448,70 @@ class _HrLeaveWidgetState extends State<HrLeaveWidget>
           SizedBox(
             width: double.infinity,
             child: FFButtonWidget(
-              onPressed: () async {
-                if (_model.selectedLeaveTypeId == null ||
-                    _model.startDate == null ||
-                    _model.endDate == null) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                        content: Text('Tafadhali jaza sehemu zote')),
-                  );
-                  return;
-                }
+              onPressed: _model.isSubmitting
+                  ? null
+                  : () async {
+                      if (_model.selectedLeaveTypeId == null ||
+                          _model.startDate == null ||
+                          _model.endDate == null) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                              content: Text('Tafadhali jaza sehemu zote')),
+                        );
+                        return;
+                      }
+                      if (_model.endDate!.isBefore(_model.startDate!)) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                              content: Text(
+                                  'Tarehe ya mwisho haiwezi kuwa kabla ya tarehe ya kuanza')),
+                        );
+                        return;
+                      }
 
-                try {
-                  await HrService.instance.submitLeaveRequest(
-                    userId: currentUserUid,
-                    leaveTypeId: _model.selectedLeaveTypeId!,
-                    startDate: _model.startDate!.toIso8601String().split('T')[0],
-                    endDate: _model.endDate!.toIso8601String().split('T')[0],
-                    reason: _model.reasonController?.text,
-                  );
+                      _model.isSubmitting = true;
+                      safeSetState(() {});
+                      try {
+                        await HrService.instance.submitLeaveRequest(
+                          userId: currentUserUid,
+                          leaveTypeId: _model.selectedLeaveTypeId!,
+                          startDate:
+                              _model.startDate!.toIso8601String().split('T')[0],
+                          endDate:
+                              _model.endDate!.toIso8601String().split('T')[0],
+                          reason: _model.reasonController?.text,
+                        );
 
-                  // Reset form
-                  _model.selectedLeaveTypeId = null;
-                  _model.startDate = null;
-                  _model.endDate = null;
-                  _model.reasonController?.clear();
+                        _model.selectedLeaveTypeId = null;
+                        _model.startDate = null;
+                        _model.endDate = null;
+                        _model.reasonController?.clear();
 
-                  if (!mounted) return;
-                  await _loadData();
-                  if (!mounted) return;
-                  _tabController.animateTo(1); // switch to requests tab
+                        if (!mounted) return;
+                        await _loadData();
+                        if (!mounted) return;
+                        _tabController.animateTo(1);
 
-                  if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Ombi limetumwa!'),
-                        backgroundColor: Color(0xFF059669),
-                      ),
-                    );
-                  }
-                } catch (e) {
-                  if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('Kosa: $e')),
-                    );
-                  }
-                }
-              },
-              text: 'Tuma Ombi',
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Ombi limetumwa!'),
+                              backgroundColor: Color(0xFF059669),
+                            ),
+                          );
+                        }
+                      } catch (e) {
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('Kosa: $e')),
+                          );
+                        }
+                      } finally {
+                        _model.isSubmitting = false;
+                        safeSetState(() {});
+                      }
+                    },
+              text: _model.isSubmitting ? 'Inatuma...' : 'Tuma Ombi',
               options: FFButtonOptions(
                 height: 50.0,
                 color: const Color(0xFF1E3A8A),

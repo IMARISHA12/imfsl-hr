@@ -12,6 +12,9 @@ class HrPerformanceModel extends FlutterFlowModel<HrPerformanceWidget> {
   /// Loading state.
   bool isLoading = true;
 
+  /// Prevents double-tap on submit button.
+  bool isSubmitting = false;
+
   /// Currently selected review for self-assessment form.
   Map<String, dynamic>? activeReview;
 

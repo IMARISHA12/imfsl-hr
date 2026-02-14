@@ -18,6 +18,9 @@ class HrAttendanceModel extends FlutterFlowModel<HrAttendanceWidget> {
   /// Loading state.
   bool isLoading = true;
 
+  /// Prevents double-tap on clock in/out buttons.
+  bool isSubmitting = false;
+
   /// Daily report text controller (for clock-out).
   TextEditingController? reportController;
 

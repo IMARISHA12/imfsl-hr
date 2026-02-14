@@ -145,16 +145,30 @@ class _HrPayslipsWidgetState extends State<HrPayslipsWidget>
   Widget _buildSalaryTab(BuildContext context) {
     final s = _model.currentSalary;
     if (s == null) {
-      return Center(
-        child: Text(
-          'Hakuna muundo wa mshahara uliowekwa',
-          style: FlutterFlowTheme.of(context).bodyMedium,
+      return RefreshIndicator(
+        onRefresh: _loadData,
+        child: ListView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          children: [
+            SizedBox(
+              height: MediaQuery.of(context).size.height * 0.5,
+              child: Center(
+                child: Text(
+                  'Hakuna muundo wa mshahara uliowekwa',
+                  style: FlutterFlowTheme.of(context).bodyMedium,
+                ),
+              ),
+            ),
+          ],
         ),
       );
     }
 
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(20.0),
+    return RefreshIndicator(
+      onRefresh: _loadData,
+      child: SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.all(20.0),
       child: Column(
         children: [
           // Gross salary header
@@ -202,6 +216,7 @@ class _HrPayslipsWidgetState extends State<HrPayslipsWidget>
             _lineItem('Posho Nyingine', s['other_allowances']),
           ]),
         ],
+      ),
       ),
     );
   }
@@ -262,17 +277,31 @@ class _HrPayslipsWidgetState extends State<HrPayslipsWidget>
 
   Widget _buildHistoryTab(BuildContext context) {
     if (_model.payslips.isEmpty) {
-      return Center(
-        child: Text(
-          'Hakuna stakabadhi za mshahara bado',
-          style: FlutterFlowTheme.of(context).bodyMedium,
+      return RefreshIndicator(
+        onRefresh: _loadData,
+        child: ListView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          children: [
+            SizedBox(
+              height: MediaQuery.of(context).size.height * 0.5,
+              child: Center(
+                child: Text(
+                  'Hakuna stakabadhi za mshahara bado',
+                  style: FlutterFlowTheme.of(context).bodyMedium,
+                ),
+              ),
+            ),
+          ],
         ),
       );
     }
 
-    return ListView.builder(
-      padding: const EdgeInsets.all(16.0),
-      itemCount: _model.payslips.length,
+    return RefreshIndicator(
+      onRefresh: _loadData,
+      child: ListView.builder(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.all(16.0),
+        itemCount: _model.payslips.length,
       itemBuilder: (context, index) {
         final ps = _model.payslips[index];
         final runs = ps['payroll_runs'] as Map<String, dynamic>? ?? {};
@@ -358,6 +387,7 @@ class _HrPayslipsWidgetState extends State<HrPayslipsWidget>
           ),
         );
       },
+      ),
     );
   }
 
@@ -459,17 +489,31 @@ class _HrPayslipsWidgetState extends State<HrPayslipsWidget>
 
   Widget _buildLoansTab(BuildContext context) {
     if (_model.loans.isEmpty) {
-      return Center(
-        child: Text(
-          'Hakuna mikopo ya mshahara',
-          style: FlutterFlowTheme.of(context).bodyMedium,
+      return RefreshIndicator(
+        onRefresh: _loadData,
+        child: ListView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          children: [
+            SizedBox(
+              height: MediaQuery.of(context).size.height * 0.5,
+              child: Center(
+                child: Text(
+                  'Hakuna mikopo ya mshahara',
+                  style: FlutterFlowTheme.of(context).bodyMedium,
+                ),
+              ),
+            ),
+          ],
         ),
       );
     }
 
-    return ListView.builder(
-      padding: const EdgeInsets.all(16.0),
-      itemCount: _model.loans.length,
+    return RefreshIndicator(
+      onRefresh: _loadData,
+      child: ListView.builder(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.all(16.0),
+        itemCount: _model.loans.length,
       itemBuilder: (context, index) {
         final loan = _model.loans[index];
         final isActive = loan['status'] == 'active';
@@ -557,6 +601,7 @@ class _HrPayslipsWidgetState extends State<HrPayslipsWidget>
           ),
         );
       },
+      ),
     );
   }
 

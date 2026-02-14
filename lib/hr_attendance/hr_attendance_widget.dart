@@ -350,7 +350,7 @@ class _HrAttendanceWidgetState extends State<HrAttendanceWidget> {
                 const SizedBox(width: 10.0),
                 Expanded(
                   child: Text(
-                    r['work_date'] ?? '',
+                    _formatDate(r['work_date']),
                     style: GoogleFonts.inter(
                         fontSize: 13.0, fontWeight: FontWeight.w500),
                   ),
@@ -371,7 +371,9 @@ class _HrAttendanceWidgetState extends State<HrAttendanceWidget> {
   }
 
   Future<void> _handleClockIn() async {
-    if (_staffId == null) return;
+    if (_staffId == null || _model.isSubmitting) return;
+    _model.isSubmitting = true;
+    safeSetState(() {});
     try {
       await HrService.instance.clockIn(_staffId!);
       await _loadData();
@@ -389,11 +391,16 @@ class _HrAttendanceWidgetState extends State<HrAttendanceWidget> {
           SnackBar(content: Text('Kosa: $e')),
         );
       }
+    } finally {
+      _model.isSubmitting = false;
+      safeSetState(() {});
     }
   }
 
   Future<void> _handleClockOut() async {
-    if (_staffId == null) return;
+    if (_staffId == null || _model.isSubmitting) return;
+    _model.isSubmitting = true;
+    safeSetState(() {});
     try {
       await HrService.instance.clockOut(
         _staffId!,
@@ -415,6 +422,16 @@ class _HrAttendanceWidgetState extends State<HrAttendanceWidget> {
           SnackBar(content: Text('Kosa: $e')),
         );
       }
+    } finally {
+      _model.isSubmitting = false;
+      safeSetState(() {});
     }
+  }
+
+  String _formatDate(dynamic raw) {
+    if (raw == null) return '-';
+    final dt = DateTime.tryParse(raw.toString());
+    if (dt == null) return raw.toString();
+    return dateTimeFormat('yMMMd', dt);
   }
 }

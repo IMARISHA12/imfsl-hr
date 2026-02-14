@@ -142,25 +142,39 @@ class _HrPerformanceWidgetState extends State<HrPerformanceWidget>
         .toList();
 
     if (pending.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
+      return RefreshIndicator(
+        onRefresh: _loadData,
+        child: ListView(
+          physics: const AlwaysScrollableScrollPhysics(),
           children: [
-            const Icon(Icons.check_circle_outline,
-                size: 64.0, color: Color(0xFF059669)),
-            const SizedBox(height: 12.0),
-            Text(
-              'Hakuna tathmini zinazosubiri',
-              style: FlutterFlowTheme.of(context).bodyLarge,
+            SizedBox(
+              height: MediaQuery.of(context).size.height * 0.5,
+              child: Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(Icons.check_circle_outline,
+                        size: 64.0, color: Color(0xFF059669)),
+                    const SizedBox(height: 12.0),
+                    Text(
+                      'Hakuna tathmini zinazosubiri',
+                      style: FlutterFlowTheme.of(context).bodyLarge,
+                    ),
+                  ],
+                ),
+              ),
             ),
           ],
         ),
       );
     }
 
-    return ListView.builder(
-      padding: const EdgeInsets.all(16.0),
-      itemCount: pending.length,
+    return RefreshIndicator(
+      onRefresh: _loadData,
+      child: ListView.builder(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.all(16.0),
+        itemCount: pending.length,
       itemBuilder: (context, index) {
         final review = pending[index];
         final cycle =
@@ -216,7 +230,7 @@ class _HrPerformanceWidgetState extends State<HrPerformanceWidget>
                 Padding(
                   padding: const EdgeInsets.only(top: 4.0),
                   child: Text(
-                    '${cycle['period_start']} - ${cycle['period_end']}',
+                    '${_formatDate(cycle['period_start'])} - ${_formatDate(cycle['period_end'])}',
                     style: FlutterFlowTheme.of(context).bodySmall.override(
                           font: GoogleFonts.inter(),
                           color:
@@ -246,6 +260,7 @@ class _HrPerformanceWidgetState extends State<HrPerformanceWidget>
           ),
         );
       },
+      ),
     );
   }
 
@@ -332,38 +347,47 @@ class _HrPerformanceWidgetState extends State<HrPerformanceWidget>
                 SizedBox(
                   width: double.infinity,
                   child: FFButtonWidget(
-                    onPressed: () async {
-                      try {
-                        await HrService.instance.submitSelfReview(
-                          reviewId: review['id'],
-                          quality: _model.quality.round(),
-                          productivity: _model.productivity.round(),
-                          teamwork: _model.teamwork.round(),
-                          initiative: _model.initiative.round(),
-                          attendance: _model.attendance.round(),
-                          comments: _model.commentsController?.text,
-                        );
-                        if (ctx.mounted) Navigator.pop(ctx);
-                        if (!mounted) return;
-                        await _loadData();
-                        if (context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content:
-                                  Text('Tathmini binafsi imetumwa!'),
-                              backgroundColor: Color(0xFF059669),
-                            ),
-                          );
-                        }
-                      } catch (e) {
-                        if (context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text('Kosa: $e')),
-                          );
-                        }
-                      }
-                    },
-                    text: 'Tuma Tathmini',
+                    onPressed: _model.isSubmitting
+                        ? null
+                        : () async {
+                            _model.isSubmitting = true;
+                            safeSetState(() {});
+                            try {
+                              await HrService.instance.submitSelfReview(
+                                reviewId: review['id'],
+                                quality: _model.quality.round(),
+                                productivity: _model.productivity.round(),
+                                teamwork: _model.teamwork.round(),
+                                initiative: _model.initiative.round(),
+                                attendance: _model.attendance.round(),
+                                comments: _model.commentsController?.text,
+                              );
+                              if (ctx.mounted) Navigator.pop(ctx);
+                              if (!mounted) return;
+                              await _loadData();
+                              if (context.mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content:
+                                        Text('Tathmini binafsi imetumwa!'),
+                                    backgroundColor: Color(0xFF059669),
+                                  ),
+                                );
+                              }
+                            } catch (e) {
+                              if (context.mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(content: Text('Kosa: $e')),
+                                );
+                              }
+                            } finally {
+                              _model.isSubmitting = false;
+                              safeSetState(() {});
+                            }
+                          },
+                    text: _model.isSubmitting
+                        ? 'Inatuma...'
+                        : 'Tuma Tathmini',
                     options: FFButtonOptions(
                       height: 50.0,
                       color: const Color(0xFF1E3A8A),
@@ -432,17 +456,31 @@ class _HrPerformanceWidgetState extends State<HrPerformanceWidget>
         _model.reviews.where((r) => r['status'] == 'completed').toList();
 
     if (completed.isEmpty) {
-      return Center(
-        child: Text(
-          'Hakuna tathmini zilizokamilika',
-          style: FlutterFlowTheme.of(context).bodyMedium,
+      return RefreshIndicator(
+        onRefresh: _loadData,
+        child: ListView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          children: [
+            SizedBox(
+              height: MediaQuery.of(context).size.height * 0.5,
+              child: Center(
+                child: Text(
+                  'Hakuna tathmini zilizokamilika',
+                  style: FlutterFlowTheme.of(context).bodyMedium,
+                ),
+              ),
+            ),
+          ],
         ),
       );
     }
 
-    return ListView.builder(
-      padding: const EdgeInsets.all(16.0),
-      itemCount: completed.length,
+    return RefreshIndicator(
+      onRefresh: _loadData,
+      child: ListView.builder(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.all(16.0),
+        itemCount: completed.length,
       itemBuilder: (context, index) {
         final review = completed[index];
         final cycle =
@@ -504,7 +542,7 @@ class _HrPerformanceWidgetState extends State<HrPerformanceWidget>
                     ),
                     if (cycle['period_start'] != null)
                       Text(
-                        '${cycle['period_start']} - ${cycle['period_end']}',
+                        '${_formatDate(cycle['period_start'])} - ${_formatDate(cycle['period_end'])}',
                         style: FlutterFlowTheme.of(context)
                             .bodySmall
                             .override(
@@ -530,6 +568,14 @@ class _HrPerformanceWidgetState extends State<HrPerformanceWidget>
           ),
         );
       },
+      ),
     );
+  }
+
+  String _formatDate(dynamic raw) {
+    if (raw == null) return '-';
+    final dt = DateTime.tryParse(raw.toString());
+    if (dt == null) return raw.toString();
+    return dateTimeFormat('yMMMd', dt);
   }
 }

@@ -125,8 +125,8 @@ class _HrManagerApprovalsWidgetState extends State<HrManagerApprovalsWidget> {
   Widget _buildRequestCard(BuildContext context, Map<String, dynamic> req) {
     final leaveType = req['leave_type'] ?? '';
     final employeeName = req['employee_name'] ?? 'N/A';
-    final startDate = req['start_date'] ?? '';
-    final endDate = req['end_date'] ?? '';
+    final startDate = _formatDate(req['start_date']);
+    final endDate = _formatDate(req['end_date']);
     final days = req['days_count'] ?? '';
     final reason = req['reason'] as String? ?? '';
 
@@ -293,54 +293,69 @@ class _HrManagerApprovalsWidgetState extends State<HrManagerApprovalsWidget> {
               backgroundColor:
                   isReject ? const Color(0xFFEF4444) : const Color(0xFF059669),
             ),
-            onPressed: () async {
-              if (isReject &&
-                  (_model.commentController?.text.isEmpty ?? true)) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                      content: Text('Sababu inahitajika kwa kukataa')),
-                );
-                return;
-              }
-              Navigator.pop(ctx);
+            onPressed: _model.isSubmitting
+                ? null
+                : () async {
+                    if (isReject &&
+                        (_model.commentController?.text.isEmpty ?? true)) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                            content: Text('Sababu inahitajika kwa kukataa')),
+                      );
+                      return;
+                    }
+                    Navigator.pop(ctx);
 
-              try {
-                final edgeFnBody = {
-                  'operation': action,
-                  'request_id': req['request_id'],
-                  'manager_comment': _model.commentController?.text ?? '',
-                  'processed_by': currentUserEmail,
-                };
-                await SupaFlow.client.functions.invoke(
-                  'hr-leave-workflow',
-                  body: edgeFnBody,
-                );
-                await _loadPendingRequests();
-                if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(isReject
-                          ? 'Ombi limekataliwa'
-                          : 'Ombi limeidhinishwa!'),
-                      backgroundColor: isReject
-                          ? const Color(0xFFEF4444)
-                          : const Color(0xFF059669),
-                    ),
-                  );
-                }
-              } catch (e) {
-                if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Kosa: $e')),
-                  );
-                }
-              }
-            },
+                    _model.isSubmitting = true;
+                    safeSetState(() {});
+                    try {
+                      final edgeFnBody = {
+                        'operation': action,
+                        'request_id': req['request_id'],
+                        'manager_comment':
+                            _model.commentController?.text ?? '',
+                        'processed_by': currentUserEmail,
+                      };
+                      await SupaFlow.client.functions.invoke(
+                        'hr-leave-workflow',
+                        body: edgeFnBody,
+                      );
+                      await _loadPendingRequests();
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(isReject
+                                ? 'Ombi limekataliwa'
+                                : 'Ombi limeidhinishwa!'),
+                            backgroundColor: isReject
+                                ? const Color(0xFFEF4444)
+                                : const Color(0xFF059669),
+                          ),
+                        );
+                      }
+                    } catch (e) {
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('Kosa: $e')),
+                        );
+                      }
+                    } finally {
+                      _model.isSubmitting = false;
+                      safeSetState(() {});
+                    }
+                  },
             child: Text(isReject ? 'Kataa' : 'Idhinisha',
                 style: const TextStyle(color: Colors.white)),
           ),
         ],
       ),
     );
+  }
+
+  String _formatDate(dynamic raw) {
+    if (raw == null) return '-';
+    final dt = DateTime.tryParse(raw.toString());
+    if (dt == null) return raw.toString();
+    return dateTimeFormat('yMMMd', dt);
   }
 }
