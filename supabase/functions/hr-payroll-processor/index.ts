@@ -13,6 +13,7 @@
 
 import { corsHeaders, jsonResponse } from "../_shared/cors.ts";
 import { getServiceClient } from "../_shared/supabase-client.ts";
+import { requireAuth, requireRole, type AuthUser } from "../_shared/auth.ts";
 
 const FUNCTION_NAME = "hr-payroll-processor";
 
@@ -33,12 +34,23 @@ Deno.serve(async (req: Request) => {
   const startTime = Date.now();
 
   try {
+    // Authenticate — ALL payroll operations require admin/finance role
+    const authResult = await requireAuth(req);
+    if (authResult instanceof Response) return authResult;
+    const user: AuthUser = authResult;
+
+    const denied = requireRole(user, ["hr_admin", "admin", "finance"]);
+    if (denied) return denied;
+
     const body: PayrollRequest = await req.json();
     const { operation } = body;
 
     if (!operation) {
       return jsonResponse({ error: "Missing 'operation' field" }, 400);
     }
+
+    // Use authenticated user identity instead of trusting client input
+    body.approved_by = user.email ?? user.id;
 
     const supabase = getServiceClient();
 

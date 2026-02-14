@@ -116,28 +116,36 @@ ALTER TABLE public.leave_balances ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.attendance_records ENABLE ROW LEVEL SECURITY;
 
 -- Service role bypass (edge functions use service role)
+DROP POLICY IF EXISTS "service_role_full_access" ON public.leave_types;
 CREATE POLICY "service_role_full_access" ON public.leave_types
   FOR ALL USING (auth.role() = 'service_role');
 
+DROP POLICY IF EXISTS "service_role_full_access" ON public.leave_requests;
 CREATE POLICY "service_role_full_access" ON public.leave_requests
   FOR ALL USING (auth.role() = 'service_role');
 
+DROP POLICY IF EXISTS "service_role_full_access" ON public.leave_balances;
 CREATE POLICY "service_role_full_access" ON public.leave_balances
   FOR ALL USING (auth.role() = 'service_role');
 
+DROP POLICY IF EXISTS "service_role_full_access" ON public.attendance_records;
 CREATE POLICY "service_role_full_access" ON public.attendance_records
   FOR ALL USING (auth.role() = 'service_role');
 
 -- Authenticated users can read leave types
+DROP POLICY IF EXISTS "authenticated_read_leave_types" ON public.leave_types;
 CREATE POLICY "authenticated_read_leave_types" ON public.leave_types
   FOR SELECT USING (auth.role() = 'authenticated');
 
 -- Users can read their own records
+DROP POLICY IF EXISTS "users_read_own_leave_requests" ON public.leave_requests;
 CREATE POLICY "users_read_own_leave_requests" ON public.leave_requests
   FOR SELECT USING (user_id = auth.uid()::text);
 
+DROP POLICY IF EXISTS "users_read_own_leave_balances" ON public.leave_balances;
 CREATE POLICY "users_read_own_leave_balances" ON public.leave_balances
   FOR SELECT USING (user_id = auth.uid()::text);
 
+DROP POLICY IF EXISTS "users_read_own_attendance" ON public.attendance_records;
 CREATE POLICY "users_read_own_attendance" ON public.attendance_records
   FOR SELECT USING (staff_id = auth.uid()::text);

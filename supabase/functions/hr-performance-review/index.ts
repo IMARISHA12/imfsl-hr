@@ -15,8 +15,12 @@
 
 import { corsHeaders, jsonResponse } from "../_shared/cors.ts";
 import { getServiceClient } from "../_shared/supabase-client.ts";
+import { requireAuth, requireRole, type AuthUser } from "../_shared/auth.ts";
 
 const FUNCTION_NAME = "hr-performance-review";
+
+// Operations requiring manager/admin role
+const ADMIN_OPS = new Set(["create_cycle", "assign_reviews", "manager_review", "calculate_kpis", "cycle_summary"]);
 
 interface ReviewRequest {
   operation: string;
@@ -54,11 +58,29 @@ Deno.serve(async (req: Request) => {
   const startTime = Date.now();
 
   try {
+    // Authenticate the caller
+    const authResult = await requireAuth(req);
+    if (authResult instanceof Response) return authResult;
+    const user: AuthUser = authResult;
+
     const body: ReviewRequest = await req.json();
     const { operation } = body;
 
     if (!operation) {
       return jsonResponse({ error: "Missing 'operation' field" }, 400);
+    }
+
+    // Enforce role for admin operations
+    if (ADMIN_OPS.has(operation)) {
+      const denied = requireRole(user, ["manager", "hr_admin", "admin"]);
+      if (denied) return denied;
+    }
+
+    // For self-service: enforce employee_id matches caller
+    if (operation === "employee_history" && body.employee_id) {
+      if (body.employee_id !== user.id && !["manager", "hr_admin", "admin"].includes(user.role ?? "")) {
+        return jsonResponse({ error: "Forbidden: can only view own performance history" }, 403);
+      }
     }
 
     const supabase = getServiceClient();

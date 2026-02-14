@@ -15,8 +15,12 @@
 
 import { corsHeaders, jsonResponse } from "../_shared/cors.ts";
 import { getServiceClient } from "../_shared/supabase-client.ts";
+import { requireAuth, requireRole, type AuthUser } from "../_shared/auth.ts";
 
 const FUNCTION_NAME = "hr-leave-workflow";
+
+// Operations that require manager/admin role
+const ADMIN_OPS = new Set(["approve", "reject", "init_year"]);
 
 interface LeaveRequest {
   operation: string;
@@ -41,11 +45,29 @@ Deno.serve(async (req: Request) => {
   const startTime = Date.now();
 
   try {
+    // Authenticate the caller
+    const authResult = await requireAuth(req);
+    if (authResult instanceof Response) return authResult;
+    const user: AuthUser = authResult;
+
     const body: LeaveRequest = await req.json();
     const { operation } = body;
 
     if (!operation) {
       return jsonResponse({ error: "Missing 'operation' field" }, 400);
+    }
+
+    // Enforce role for admin operations
+    if (ADMIN_OPS.has(operation)) {
+      const denied = requireRole(user, ["manager", "hr_admin", "admin"]);
+      if (denied) return denied;
+    }
+
+    // For self-service ops, enforce user_id matches caller
+    if ((operation === "submit" || operation === "balance" || operation === "cancel") && body.user_id) {
+      if (body.user_id !== user.id && !["manager", "hr_admin", "admin"].includes(user.role ?? "")) {
+        return jsonResponse({ error: "Forbidden: can only access own leave data" }, 403);
+      }
     }
 
     const supabase = getServiceClient();

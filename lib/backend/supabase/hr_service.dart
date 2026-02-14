@@ -23,7 +23,8 @@ class HrService {
         .from('payroll_runs')
         .select()
         .order('run_period_year', ascending: false)
-        .order('run_period_month', ascending: false);
+        .order('run_period_month', ascending: false)
+        .limit(50);
     return List<Map<String, dynamic>>.from(res);
   }
 
@@ -100,7 +101,8 @@ class HrService {
         .from('v_leave_dashboard')
         .select()
         .eq('status', 'pending')
-        .order('requested_at', ascending: false);
+        .order('requested_at', ascending: false)
+        .limit(100);
     return List<Map<String, dynamic>>.from(res);
   }
 
@@ -189,7 +191,8 @@ class HrService {
     final res = await _client
         .from('performance_review_cycles')
         .select()
-        .order('period_start', ascending: false);
+        .order('period_start', ascending: false)
+        .limit(20);
     return List<Map<String, dynamic>>.from(res);
   }
 
@@ -240,8 +243,14 @@ class HrService {
 
   /// Get unread notification count.
   Future<int> getUnreadNotificationCount() async {
-    final res = await _client.rpc('rpc_unread_notification_count');
-    return (res as Map<String, dynamic>?)?['count'] ?? 0;
+    try {
+      final res = await _client.rpc('rpc_unread_notification_count');
+      if (res is int) return res;
+      if (res is Map) return (res['count'] as int?) ?? 0;
+      return 0;
+    } catch (_) {
+      return 0;
+    }
   }
 
   /// Get notifications with pagination.
@@ -255,7 +264,10 @@ class HrService {
       'p_offset': offset,
       'p_unread_only': unreadOnly,
     });
-    return Map<String, dynamic>.from(res as Map);
+    if (res is Map) {
+      return Map<String, dynamic>.from(res);
+    }
+    return {'notifications': [], 'total': 0};
   }
 
   /// Mark notifications as read.
@@ -272,7 +284,10 @@ class HrService {
   /// Get HR dashboard KPIs (headcount, payroll, leave, attendance, performance).
   Future<Map<String, dynamic>> getDashboardKpis() async {
     final res = await _client.rpc('rpc_hr_dashboard_kpis');
-    return Map<String, dynamic>.from(res as Map);
+    if (res is Map) {
+      return Map<String, dynamic>.from(res);
+    }
+    return {};
   }
 
   /// Get staff salary loans for an employee.
@@ -299,13 +314,26 @@ class HrService {
     );
 
     if (response.status >= 400) {
-      final error = jsonDecode(response.data);
-      throw Exception(error['error'] ?? 'Edge function error ($functionName)');
+      String errorMsg = 'Edge function error ($functionName)';
+      try {
+        final error = response.data is String
+            ? jsonDecode(response.data)
+            : response.data;
+        if (error is Map) {
+          errorMsg = (error['error'] as String?) ?? errorMsg;
+        }
+      } catch (_) {
+        // Non-JSON error response — use default message
+      }
+      throw Exception(errorMsg);
     }
 
     final decoded = response.data is String
         ? jsonDecode(response.data)
         : response.data;
-    return Map<String, dynamic>.from(decoded as Map);
+    if (decoded is Map) {
+      return Map<String, dynamic>.from(decoded);
+    }
+    return {'data': decoded};
   }
 }

@@ -19,7 +19,7 @@ ALTER TABLE public.statutory_deductions ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS tax_brackets_read ON public.tax_brackets;
 CREATE POLICY tax_brackets_read ON public.tax_brackets
-  FOR SELECT USING (true); -- public read (reference data)
+  FOR SELECT USING (auth.role() IN ('authenticated', 'service_role'));
 
 DROP POLICY IF EXISTS tax_brackets_admin ON public.tax_brackets;
 CREATE POLICY tax_brackets_admin ON public.tax_brackets
@@ -27,7 +27,7 @@ CREATE POLICY tax_brackets_admin ON public.tax_brackets
 
 DROP POLICY IF EXISTS statutory_deductions_read ON public.statutory_deductions;
 CREATE POLICY statutory_deductions_read ON public.statutory_deductions
-  FOR SELECT USING (true);
+  FOR SELECT USING (auth.role() IN ('authenticated', 'service_role'));
 
 DROP POLICY IF EXISTS statutory_deductions_admin ON public.statutory_deductions;
 CREATE POLICY statutory_deductions_admin ON public.statutory_deductions
@@ -145,7 +145,7 @@ DO $$ BEGIN
 
     DROP POLICY IF EXISTS leave_types_read ON public.leave_types;
     CREATE POLICY leave_types_read ON public.leave_types
-      FOR SELECT USING (true);
+      FOR SELECT USING (auth.role() IN ('authenticated', 'service_role'));
 
     DROP POLICY IF EXISTS leave_types_admin ON public.leave_types;
     CREATE POLICY leave_types_admin ON public.leave_types
