@@ -15,6 +15,9 @@ class SupaFlow {
   final _supabase = Supabase.instance.client;
   static SupabaseClient get client => instance._supabase;
 
+  /// The base project URL (e.g. https://api.admin-imarishamaisha.co.tz).
+  static String get supabaseUrl => _kSupabaseUrl;
+
   static Future initialize() => Supabase.initialize(
         url: _kSupabaseUrl,
         headers: {
