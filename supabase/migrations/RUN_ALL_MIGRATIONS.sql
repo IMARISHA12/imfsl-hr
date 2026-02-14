@@ -459,9 +459,10 @@ GRANT SELECT ON public.v_repayment_history TO service_role, authenticated;
 -- │   2. 007_hr_business_logic.sql     (Payroll, Leave, Attendance, Perf.)│
 -- │   3. 008_scheduled_tasks.sql       (Cron jobs, arrears, leave accrual)│
 -- │   4. 009_rls_policies_and_integration.sql (RLS, notifications, audit)│
+-- │   5. 010_staff_performance_monthly.sql (KPI snapshots, dashboard fn)│
 -- │                                                                        │
 -- │ After migrations, run seed data:                                       │
--- │   5. seed/003_hr_master_data.sql   (Tax brackets, deductions, leaves) │
+-- │   6. seed/003_hr_master_data.sql   (Tax brackets, deductions, leaves) │
 -- │                                                                        │
 -- │ These are too large for a single SQL Editor run.                       │
 -- └─────────────────────────────────────────────────────────────────────────┘

@@ -5,6 +5,16 @@ export '../supabase.dart';
 export 'row.dart';
 export 'table.dart';
 
+export 'tables/payslips.dart';
+export 'tables/salary_structures.dart';
+export 'tables/tax_brackets.dart';
+export 'tables/statutory_deductions.dart';
+export 'tables/staff_salary_loans.dart';
+export 'tables/performance_review_cycles.dart';
+export 'tables/performance_reviews.dart';
+export 'tables/performance_goals.dart';
+export 'tables/hr_notifications.dart';
+export 'tables/hr_audit_log.dart';
 export 'tables/gl_periods.dart';
 export 'tables/scheduled_report_recipients.dart';
 export 'tables/guardian_alerts.dart';
