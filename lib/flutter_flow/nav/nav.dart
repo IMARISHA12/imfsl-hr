@@ -103,7 +103,43 @@ GoRouter createRouter(AppStateNotifier appStateNotifier) => GoRouter(
           path: HomepagestaffWidget.routePath,
           requireAuth: true,
           builder: (context, params) => HomepagestaffWidget(),
-        )
+        ),
+        FFRoute(
+          name: HrDashboardWidget.routeName,
+          path: HrDashboardWidget.routePath,
+          requireAuth: true,
+          builder: (context, params) => HrDashboardWidget(),
+        ),
+        FFRoute(
+          name: HrPayslipsWidget.routeName,
+          path: HrPayslipsWidget.routePath,
+          requireAuth: true,
+          builder: (context, params) => HrPayslipsWidget(),
+        ),
+        FFRoute(
+          name: HrLeaveWidget.routeName,
+          path: HrLeaveWidget.routePath,
+          requireAuth: true,
+          builder: (context, params) => HrLeaveWidget(),
+        ),
+        FFRoute(
+          name: HrAttendanceWidget.routeName,
+          path: HrAttendanceWidget.routePath,
+          requireAuth: true,
+          builder: (context, params) => HrAttendanceWidget(),
+        ),
+        FFRoute(
+          name: HrPerformanceWidget.routeName,
+          path: HrPerformanceWidget.routePath,
+          requireAuth: true,
+          builder: (context, params) => HrPerformanceWidget(),
+        ),
+        FFRoute(
+          name: HrNotificationsWidget.routeName,
+          path: HrNotificationsWidget.routePath,
+          requireAuth: true,
+          builder: (context, params) => HrNotificationsWidget(),
+        ),
       ].map((r) => r.toRoute(appStateNotifier)).toList(),
     );
 

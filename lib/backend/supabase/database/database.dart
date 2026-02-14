@@ -15,6 +15,8 @@ export 'tables/performance_reviews.dart';
 export 'tables/performance_goals.dart';
 export 'tables/hr_notifications.dart';
 export 'tables/hr_audit_log.dart';
+export 'tables/payslip_deductions.dart';
+export 'tables/scheduled_task_runs.dart';
 export 'tables/gl_periods.dart';
 export 'tables/scheduled_report_recipients.dart';
 export 'tables/guardian_alerts.dart';
