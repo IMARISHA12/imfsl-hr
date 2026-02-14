@@ -116,7 +116,7 @@ Deno.serve(async (req: Request) => {
     // Count loans with LD- loan numbers
     const { data: loanRows } = await supabase
       .from("loans")
-      .select("amount_principal, outstanding_balance")
+      .select("id, amount_principal, outstanding_balance")
       .like("loan_number", "LD-%");
     const sysTotalLoans = loanRows?.length ?? 0;
     const sysTotalDisbursed = (loanRows || []).reduce(

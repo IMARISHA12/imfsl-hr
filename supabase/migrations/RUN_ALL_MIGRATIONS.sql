@@ -162,6 +162,7 @@ UPDATE public.employees SET nida_number = COALESCE(
   NULLIF(trim(nida_number), ''), NULLIF(trim(national_id), ''))
 WHERE nida_number IS NULL AND national_id IS NOT NULL;
 
+ALTER TABLE public.employees ALTER COLUMN email SET NOT NULL;
 UPDATE public.employees SET email = normalize_email(email) WHERE email IS NOT NULL;
 UPDATE public.employees SET phone = normalize_phone_tz(phone) WHERE phone IS NOT NULL AND phone != '';
 
@@ -193,7 +194,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_clients_nida_unique ON public.clients (nid
 CREATE INDEX IF NOT EXISTS idx_clients_status_risk ON public.clients (status, risk_level);
 DO $$ BEGIN
   ALTER TABLE public.clients ADD CONSTRAINT chk_clients_phone_format
-    CHECK (phone_number ~ '^\+255[0-9]{9}$' OR phone_number ~ '^0[0-9]{9}$');
+    CHECK (phone_number ~ '^\+255[0-9]{9}$');
 EXCEPTION WHEN duplicate_object THEN NULL;
 END $$;
 

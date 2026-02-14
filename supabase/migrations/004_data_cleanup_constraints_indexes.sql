@@ -59,8 +59,11 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_staff_email_unique
   ON public.staff (lower(email));
 
 -- B6. Add CHECK constraint for email format
-ALTER TABLE public.staff ADD CONSTRAINT chk_staff_email_format
-  CHECK (email ~* '^[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}$');
+DO $$ BEGIN
+  ALTER TABLE public.staff ADD CONSTRAINT chk_staff_email_format
+    CHECK (email ~* '^[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}$');
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
 
 -- B7. Add UNIQUE constraint on user_id (where not null)
 CREATE UNIQUE INDEX IF NOT EXISTS idx_staff_user_id_unique
@@ -93,6 +96,9 @@ SET nida_number = COALESCE(
 )
 WHERE nida_number IS NULL AND national_id IS NOT NULL;
 
+-- C2b. Make email NOT NULL (all 6 employees have emails)
+ALTER TABLE public.employees ALTER COLUMN email SET NOT NULL;
+
 -- C3. Normalize existing emails
 UPDATE public.employees SET email = normalize_email(email) WHERE email IS NOT NULL;
 
@@ -105,8 +111,11 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_employees_email_unique
   ON public.employees (lower(email));
 
 -- C6. Add CHECK constraint for email format
-ALTER TABLE public.employees ADD CONSTRAINT chk_employees_email_format
-  CHECK (email ~* '^[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}$');
+DO $$ BEGIN
+  ALTER TABLE public.employees ADD CONSTRAINT chk_employees_email_format
+    CHECK (email ~* '^[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}$');
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
 
 -- C7. UNIQUE constraint on employee_code (likely exists, but ensure)
 CREATE UNIQUE INDEX IF NOT EXISTS idx_employees_code_unique
@@ -157,9 +166,12 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_clients_nida_unique
 CREATE INDEX IF NOT EXISTS idx_clients_status_risk
   ON public.clients (status, risk_level);
 
--- D6. Add CHECK for phone format (Tanzania E.164)
-ALTER TABLE public.clients ADD CONSTRAINT chk_clients_phone_format
-  CHECK (phone_number ~ '^\+255[0-9]{9}$' OR phone_number ~ '^0[0-9]{9}$');
+-- D6. Add CHECK for phone format (Tanzania E.164 — only normalized format allowed)
+DO $$ BEGIN
+  ALTER TABLE public.clients ADD CONSTRAINT chk_clients_phone_format
+    CHECK (phone_number ~ '^\+255[0-9]{9}$');
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
 
 -- ═══════════════════════════════════════════════════════════════════════
 -- PART E: CUSTOMERS TABLE — Constrain

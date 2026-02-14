@@ -161,6 +161,33 @@ Deno.serve(async (req: Request) => {
       const validationErr = validateRepayment(repayment);
       if (validationErr) {
         console.error("Repayment validation failed:", validationErr);
+        await recordSyncLineage(
+          supabase,
+          { action, localId: null, externalRef, entityType: "repayment" },
+          payload,
+          `Validation failed: ${validationErr}`,
+        );
+        await logAccess(supabase, req, action, `repayment/${loandiskId}`, {
+          event_key: eventKey,
+          local_id: null,
+          branch_id: branchId,
+          validation_error: validationErr,
+        });
+        const durationMs = Date.now() - startTime;
+        recordMetric(supabase, FUNCTION_NAME, startTime, "validation_failed", req, {
+          event_key: eventKey,
+          loandisk_id: loandiskId,
+        }, validationErr);
+        return new Response(
+          JSON.stringify({
+            success: false,
+            error: `Validation failed: ${validationErr}`,
+            event: eventKey,
+            loandisk_id: loandiskId,
+            duration_ms: durationMs,
+          }),
+          { status: 422, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
       }
 
       const repaymentFields = transformRepayment(repayment, localLoanId);

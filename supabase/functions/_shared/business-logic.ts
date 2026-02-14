@@ -290,7 +290,7 @@ export const CASCADE_RULES = {
      * When a borrower is deleted:
      * 1. borrowers.status → 'inactive'
      * 2. clients.status → 'inactive'
-     * 3. All active loans for that borrower → 'cancelled'
+     * 3. All active loans for that borrower → 'defaulted'
      * 4. Log the cascade in access_log
      */
     affectedTables: ["borrowers", "clients", "loans"],
@@ -298,7 +298,7 @@ export const CASCADE_RULES = {
   loan: {
     /**
      * When a loan is deleted:
-     * 1. loans.status → 'cancelled'
+     * 1. loans.status → 'defaulted'
      * 2. Update client risk (if applicable)
      */
     affectedTables: ["loans"],
