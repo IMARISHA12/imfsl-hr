@@ -122,16 +122,27 @@ class _HrNotificationsWidgetState extends State<HrNotificationsWidget> {
                 ),
               )
             : _model.notifications.isEmpty
-                ? Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
+                ? RefreshIndicator(
+                    onRefresh: _loadNotifications,
+                    child: ListView(
+                      physics: const AlwaysScrollableScrollPhysics(),
                       children: [
-                        const Icon(Icons.notifications_off_outlined,
-                            size: 64.0, color: Color(0xFF9CA3AF)),
-                        const SizedBox(height: 12.0),
-                        Text(
-                          'Hakuna arifa',
-                          style: FlutterFlowTheme.of(context).bodyLarge,
+                        SizedBox(
+                          height: MediaQuery.of(context).size.height * 0.6,
+                          child: Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                const Icon(Icons.notifications_off_outlined,
+                                    size: 64.0, color: Color(0xFF9CA3AF)),
+                                const SizedBox(height: 12.0),
+                                Text(
+                                  'Hakuna arifa',
+                                  style: FlutterFlowTheme.of(context).bodyLarge,
+                                ),
+                              ],
+                            ),
+                          ),
                         ),
                       ],
                     ),

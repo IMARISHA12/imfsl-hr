@@ -100,14 +100,28 @@ class _HrProfileWidgetState extends State<HrProfileWidget> {
                 ),
               )
             : _model.employee == null
-                ? Center(
-                    child: Text(
-                      'Rekodi ya mfanyakazi haijapatikana',
-                      style: FlutterFlowTheme.of(context).bodyMedium,
+                ? RefreshIndicator(
+                    onRefresh: _loadProfile,
+                    child: ListView(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      children: [
+                        SizedBox(
+                          height: MediaQuery.of(context).size.height * 0.6,
+                          child: Center(
+                            child: Text(
+                              'Rekodi ya mfanyakazi haijapatikana',
+                              style: FlutterFlowTheme.of(context).bodyMedium,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   )
-                : SingleChildScrollView(
-                    padding: const EdgeInsets.all(20.0),
+                : RefreshIndicator(
+                    onRefresh: _loadProfile,
+                    child: SingleChildScrollView(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      padding: const EdgeInsets.all(20.0),
                     child: Column(
                       children: [
                         _buildProfileHeader(context),
@@ -214,6 +228,7 @@ class _HrProfileWidgetState extends State<HrProfileWidget> {
                         const SizedBox(height: 20.0),
                       ],
                     ),
+                  ),
                   ),
       ),
     );
