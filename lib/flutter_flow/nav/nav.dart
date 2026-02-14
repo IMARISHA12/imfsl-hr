@@ -140,6 +140,18 @@ GoRouter createRouter(AppStateNotifier appStateNotifier) => GoRouter(
           requireAuth: true,
           builder: (context, params) => HrNotificationsWidget(),
         ),
+        FFRoute(
+          name: HrProfileWidget.routeName,
+          path: HrProfileWidget.routePath,
+          requireAuth: true,
+          builder: (context, params) => HrProfileWidget(),
+        ),
+        FFRoute(
+          name: HrManagerApprovalsWidget.routeName,
+          path: HrManagerApprovalsWidget.routePath,
+          requireAuth: true,
+          builder: (context, params) => HrManagerApprovalsWidget(),
+        ),
       ].map((r) => r.toRoute(appStateNotifier)).toList(),
     );
 

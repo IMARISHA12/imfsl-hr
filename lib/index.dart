@@ -8,3 +8,6 @@ export '/hr_attendance/hr_attendance_widget.dart' show HrAttendanceWidget;
 export '/hr_performance/hr_performance_widget.dart' show HrPerformanceWidget;
 export '/hr_notifications/hr_notifications_widget.dart'
     show HrNotificationsWidget;
+export '/hr_profile/hr_profile_widget.dart' show HrProfileWidget;
+export '/hr_manager_approvals/hr_manager_approvals_widget.dart'
+    show HrManagerApprovalsWidget;
