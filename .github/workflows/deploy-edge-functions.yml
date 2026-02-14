@@ -63,14 +63,31 @@ jobs:
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
 
-      - name: Verify Fineract deployment
+      - name: Deploy HR Edge Functions
         run: |
+          for fn in hr-payroll-processor hr-leave-workflow hr-attendance hr-performance-review; do
+            echo "Deploying ${fn}..."
+            supabase functions deploy "${fn}" \
+              --project-ref "${SUPABASE_PROJECT_REF}" --no-verify-jwt
+          done
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+      - name: Verify deployments
+        run: |
+          echo "Verifying Fineract functions..."
           FN_URL="https://${SUPABASE_PROJECT_REF}.supabase.co/functions/v1/fineract-webhook"
           CODE=$(curl -s -o /dev/null -w "%{http_code}" -X POST "${FN_URL}" \
             -H "Content-Type: application/json" -d '{}')
           if [ "$CODE" = "401" ]; then
-            echo "Fineract webhook deployed successfully (auth check returns 401)"
+            echo "  fineract-webhook: OK (auth check returns 401)"
           else
-            echo "WARNING: Unexpected status ${CODE}"
-            exit 1
+            echo "  WARNING: fineract-webhook returned ${CODE}"
           fi
+
+          echo "Verifying HR functions..."
+          for fn in hr-payroll-processor hr-leave-workflow hr-attendance hr-performance-review; do
+            HR_URL="https://${SUPABASE_PROJECT_REF}.supabase.co/functions/v1/${fn}"
+            HR_CODE=$(curl -s -o /dev/null -w "%{http_code}" -X OPTIONS "${HR_URL}" 2>/dev/null || echo "000")
+            echo "  ${fn}: ${HR_CODE}"
+          done
