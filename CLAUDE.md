@@ -28,6 +28,9 @@ imfsl-hr/
 │   ├── backend/                  # Backend service integrations
 │   │   ├── firebase/             # Firebase config
 │   │   ├── firebase_dynamic_links/
+│   │   ├── fineract/             # Apache Fineract integration
+│   │   │   ├── fineract_config.dart   # Config model loaded from DB
+│   │   │   └── fineract_service.dart  # Singleton service (sync, mappings, logging)
 │   │   └── supabase/             # Supabase client & database layer
 │   │       └── database/
 │   │           ├── database.dart # Main DB exports
@@ -56,8 +59,10 @@ imfsl-hr/
 │   ├── storage.rules             # Storage security rules
 │   └── functions/                # Cloud Functions (Node.js 20)
 │       ├── package.json
-│       ├── index.js
-│       └── api_manager.js
+│       ├── index.js              # Function exports (includes fineractApi)
+│       ├── api_manager.js        # API call router (includes Fineract handlers)
+│       ├── fineract_client.js    # Apache Fineract REST API client
+│       └── fineract_handlers.js  # Fineract callable function handlers
 ├── android/                      # Android platform code
 ├── ios/                          # iOS platform code (min iOS 14.0)
 ├── web/                          # Web platform (Flutter web)
@@ -86,6 +91,7 @@ imfsl-hr/
 | Local Storage | SharedPreferences, Hive, SQLite |
 | AI/ML (server-side) | LangChain (OpenAI, Anthropic, Google GenAI) |
 | Payments (server-side) | Stripe, Braintree, Razorpay |
+| Core Banking | Apache Fineract (via Cloud Functions proxy) |
 
 ## Build & Run Commands
 
@@ -187,6 +193,7 @@ The Supabase database has **~431 tables** covering:
 - **Security/Audit:** `access_logs`, `security_audit_logs`, `role_permissions`, `audit_logs`
 - **Collections:** `collections`, `collection_cases`, `promise_to_pay`
 - **Alerts:** `alert_rules`, `alert_logs`, `alert_notifications`
+- **Third-party Integrations:** `loandisk_*` (LoanDisk), `fineract_*` (Apache Fineract)
 - **Archives:** `z_archive_*` tables for historical data
 - **Views:** `mv_*` (materialized views), `v_*` (views)
 
@@ -225,6 +232,86 @@ Table definitions are auto-generated in `lib/backend/supabase/database/tables/`.
   }
 }
 ```
+
+## Apache Fineract Integration
+
+The project integrates with **Apache Fineract**, an open-source core banking platform, for loan management, savings accounts, client records, and GL accounting.
+
+### Architecture
+
+```
+Flutter App (Dart)              Firebase Cloud Functions (Node.js)       Apache Fineract
+┌──────────────────┐            ┌──────────────────────────┐            ┌──────────────┐
+│ FineractService   │──callable──▶ fineractApi (index.js)   │──HTTP──▶  │ REST API v1  │
+│ (singleton)       │            │   └─ fineract_handlers.js│            │ /api/v1/...  │
+│                   │            │       └─ fineract_client  │            └──────────────┘
+│ Supabase tables:  │            └──────────────────────────┘
+│ fineract_*        │
+└──────────────────┘
+```
+
+- **Flutter side:** `FineractService` (`lib/backend/fineract/fineract_service.dart`) manages configuration, sync runs, entity mappings, and access logs via Supabase
+- **Cloud Functions side:** `fineract_client.js` provides an authenticated HTTP client for all Fineract REST endpoints. `fineract_handlers.js` maps call names to handler functions that are invoked via the `fineractApi` callable function
+- **Credentials** are stored in the `fineract_integrations` Supabase table (never hard-coded)
+
+### Supported Fineract Operations
+
+| Call Name | Fineract Endpoint | Description |
+|-----------|-------------------|-------------|
+| `fineractGetClients` | `GET /clients` | List clients with pagination |
+| `fineractGetClient` | `GET /clients/{id}` | Get single client details |
+| `fineractCreateClient` | `POST /clients` | Create a new client |
+| `fineractGetLoans` | `GET /loans` | List loans |
+| `fineractGetLoan` | `GET /loans/{id}` | Get loan with associations |
+| `fineractCreateLoan` | `POST /loans` | Create a loan application |
+| `fineractApproveLoan` | `POST /loans/{id}?command=approve` | Approve a loan |
+| `fineractDisburseLoan` | `POST /loans/{id}?command=disburse` | Disburse a loan |
+| `fineractMakeRepayment` | `POST /loans/{id}/transactions?command=repayment` | Record a repayment |
+| `fineractGetSavingsAccounts` | `GET /savingsaccounts` | List savings accounts |
+| `fineractGetOffices` | `GET /offices` | List offices/branches |
+| `fineractGetStaff` | `GET /staff` | List staff members |
+| `fineractGetLoanProducts` | `GET /loanproducts` | List loan products |
+| `fineractGetGLAccounts` | `GET /glaccounts` | List GL accounts |
+| `fineractGetJournalEntries` | `GET /journalentries` | List journal entries |
+| `fineractSearch` | `GET /search` | Global entity search |
+
+### Supabase Tables for Fineract
+
+| Table | Purpose |
+|-------|---------|
+| `fineract_integrations` | Connection config (URL, tenant, credentials, sync flags) |
+| `fineract_sync_runs` | History of sync executions with record counts |
+| `fineract_sync_items` | Individual entity records processed during sync |
+| `fineract_entity_mappings` | Maps Fineract IDs to local Supabase IDs |
+| `fineract_access_log` | Audit trail of all Fineract API access |
+| `fineract_reconciliation_snapshots` | Periodic data reconciliation between systems |
+
+### Entity Mapping Pattern
+
+The `fineract_entity_mappings` table maintains a bidirectional mapping between Fineract entity IDs and local Supabase record IDs:
+
+```dart
+// Look up local ID for a Fineract loan
+final localId = await FineractService.instance.getLocalId(
+  entityType: FineractEntityType.loan,
+  fineractId: '12345',
+);
+
+// Create or update a mapping
+await FineractService.instance.upsertEntityMapping(
+  entityType: FineractEntityType.client,
+  fineractId: '67890',
+  localId: localClientUuid,
+  localTableName: 'clients',
+);
+```
+
+### Adding New Fineract Operations
+
+1. Add the API method in `firebase/functions/fineract_client.js`
+2. Add a handler function in `firebase/functions/fineract_handlers.js`
+3. Register the handler in the `fineractCallMap` export
+4. The handler is automatically available via the `fineractApi` Cloud Function
 
 ## Linting & Code Quality
 

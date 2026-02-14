@@ -1,5 +1,6 @@
 const axios = require("axios").default;
 const qs = require("qs");
+const { fineractCallMap } = require("./fineract_handlers");
 
 /// Helper functions to route to the appropriate API Call.
 
@@ -7,7 +8,9 @@ async function makeApiCall(context, data) {
   var callName = data["callName"] || "";
   var variables = data["variables"] || {};
 
-  const callMap = {};
+  const callMap = {
+    ...fineractCallMap,
+  };
 
   if (!(callName in callMap)) {
     return {
