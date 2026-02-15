@@ -1,21 +1,17 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/scheduler.dart';
 import 'package:provider/provider.dart';
 
 
 import '/auth/base_auth_user_provider.dart';
 
-import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
 
 import '/index.dart';
 
 export 'package:go_router/go_router.dart';
 export 'serialization_util.dart';
-export '/backend/firebase_dynamic_links/firebase_dynamic_links.dart'
-    show generateCurrentPageLink;
 
 const kTransitionInfoKey = '__transition_info__';
 
@@ -79,12 +75,8 @@ GoRouter createRouter(AppStateNotifier appStateNotifier) => GoRouter(
       debugLogDiagnostics: true,
       refreshListenable: appStateNotifier,
       navigatorKey: appNavigatorKey,
-      errorBuilder: (context, state) => _RouteErrorBuilder(
-        state: state,
-        child: appStateNotifier.loggedIn
-            ? HomepagestaffWidget()
-            : LoginPageWidget(),
-      ),
+      errorBuilder: (context, state) =>
+          appStateNotifier.loggedIn ? HomepagestaffWidget() : LoginPageWidget(),
       routes: [
         FFRoute(
           name: '_initialize',
@@ -103,6 +95,47 @@ GoRouter createRouter(AppStateNotifier appStateNotifier) => GoRouter(
           path: HomepagestaffWidget.routePath,
           requireAuth: true,
           builder: (context, params) => HomepagestaffWidget(),
+        ),
+        FFRoute(
+          name: HistoriayaMahudhurioWidget.routeName,
+          path: HistoriayaMahudhurioWidget.routePath,
+          requireAuth: true,
+          builder: (context, params) => HistoriayaMahudhurioWidget(),
+        ),
+        FFRoute(
+          name: LeavepageWidget.routeName,
+          path: LeavepageWidget.routePath,
+          requireAuth: true,
+          builder: (context, params) => LeavepageWidget(),
+        ),
+        FFRoute(
+          name: ProfileWidget.routeName,
+          path: ProfileWidget.routePath,
+          requireAuth: true,
+          builder: (context, params) => ProfileWidget(),
+        ),
+        FFRoute(
+          name: SplashWidget.routeName,
+          path: SplashWidget.routePath,
+          requireAuth: true,
+          builder: (context, params) => SplashWidget(),
+        ),
+        FFRoute(
+          name: SignupSignupWidget.routeName,
+          path: SignupSignupWidget.routePath,
+          builder: (context, params) => SignupSignupWidget(),
+        ),
+        FFRoute(
+          name: UsajiliWidget.routeName,
+          path: UsajiliWidget.routePath,
+          requireAuth: true,
+          builder: (context, params) => UsajiliWidget(),
+        ),
+        FFRoute(
+          name: MsaadaWidget.routeName,
+          path: MsaadaWidget.routePath,
+          requireAuth: true,
+          builder: (context, params) => MsaadaWidget(),
         )
       ].map((r) => r.toRoute(appStateNotifier)).toList(),
     );
@@ -285,15 +318,11 @@ class FFRoute {
                 )
               : builder(context, ffParams);
           final child = appStateNotifier.loading
-              ? Center(
-                  child: SizedBox(
-                    width: 50.0,
-                    height: 50.0,
-                    child: CircularProgressIndicator(
-                      valueColor: AlwaysStoppedAnimation<Color>(
-                        FlutterFlowTheme.of(context).primary,
-                      ),
-                    ),
+              ? Container(
+                  color: Colors.transparent,
+                  child: Image.asset(
+                    'assets/images/icon-64x64-white.jpg',
+                    fit: BoxFit.cover,
                   ),
                 )
               : page;
@@ -339,58 +368,6 @@ class TransitionInfo {
   final Alignment? alignment;
 
   static TransitionInfo appDefault() => TransitionInfo(hasTransition: false);
-}
-
-class _RouteErrorBuilder extends StatefulWidget {
-  const _RouteErrorBuilder({
-    Key? key,
-    required this.state,
-    required this.child,
-  }) : super(key: key);
-
-  final GoRouterState state;
-  final Widget child;
-
-  @override
-  State<_RouteErrorBuilder> createState() => _RouteErrorBuilderState();
-}
-
-class _RouteErrorBuilderState extends State<_RouteErrorBuilder> {
-  @override
-  void initState() {
-    super.initState();
-
-    // Handle erroneous links from Firebase Dynamic Links.
-
-    String? location;
-
-    /*
-    Handle `links` routes that have dynamic-link entangled with deep-link 
-    */
-    if (widget.state.uri.toString().startsWith('/link') &&
-        widget.state.uri.queryParameters.containsKey('deep_link_id')) {
-      final deepLinkId = widget.state.uri.queryParameters['deep_link_id'];
-      if (deepLinkId != null) {
-        final deepLinkUri = Uri.parse(deepLinkId);
-        final link = deepLinkUri.toString();
-        final host = deepLinkUri.host;
-        location = link.split(host).last;
-      }
-    }
-
-    if (widget.state.uri.toString().startsWith('/link') &&
-        widget.state.uri.toString().contains('request_ip_version')) {
-      location = '/';
-    }
-
-    if (location != null) {
-      SchedulerBinding.instance
-          .addPostFrameCallback((_) => context.go(location!));
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) => widget.child;
 }
 
 class RootPageContext {

@@ -18,24 +18,14 @@ class LeaveBalancesRow extends SupabaseDataRow {
   String get id => getField<String>('id')!;
   set id(String value) => setField<String>('id', value);
 
-  String get userId => getField<String>('user_id')!;
-  set userId(String value) => setField<String>('user_id', value);
+  String get staffId => getField<String>('staff_id')!;
+  set staffId(String value) => setField<String>('staff_id', value);
 
-  String get leaveTypeId => getField<String>('leave_type_id')!;
-  set leaveTypeId(String value) => setField<String>('leave_type_id', value);
-
-  int get year => getField<int>('year')!;
-  set year(int value) => setField<int>('year', value);
+  String get leaveType => getField<String>('leave_type')!;
+  set leaveType(String value) => setField<String>('leave_type', value);
 
   int? get remainingDays => getField<int>('remaining_days');
   set remainingDays(int? value) => setField<int>('remaining_days', value);
-
-  int? get usedDays => getField<int>('used_days');
-  set usedDays(int? value) => setField<int>('used_days', value);
-
-  int? get annualEntitlement => getField<int>('annual_entitlement');
-  set annualEntitlement(int? value) =>
-      setField<int>('annual_entitlement', value);
 
   DateTime? get createdAt => getField<DateTime>('created_at');
   set createdAt(DateTime? value) => setField<DateTime>('created_at', value);

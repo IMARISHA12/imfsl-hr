@@ -1,6 +1,7 @@
 import 'package:supabase_flutter/supabase_flutter.dart' hide Provider;
 
 export 'database/database.dart';
+export 'storage/storage.dart';
 
 String _kSupabaseUrl = 'https://api.admin-imarishamaisha.co.tz';
 String _kSupabaseAnonKey =

@@ -29,4 +29,7 @@ class RoomMessagesDemoRow extends SupabaseDataRow {
 
   DateTime? get updatedAt => getField<DateTime>('updated_at');
   set updatedAt(DateTime? value) => setField<DateTime>('updated_at', value);
+
+  String? get profileId => getField<String>('profile_id');
+  set profileId(String? value) => setField<String>('profile_id', value);
 }

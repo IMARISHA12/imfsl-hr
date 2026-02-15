@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "893340272831",
+    "project_id": "i-m-f-s-l-staff-n2anb4",
+    "storage_bucket": "i-m-f-s-l-staff-n2anb4.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:893340272831:android:1dcc1792ec51ccd56f1e0a",
+        "android_client_info": {
+          "package_name": "com.mycompany.imfslstaff"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCUiP6EhHxhQ_Rny_SEXFaX6sTsppfdegw"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

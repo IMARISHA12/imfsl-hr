@@ -1,4 +1,5 @@
 import '/auth/supabase_auth/auth_util.dart';
+import '/backend/supabase/supabase.dart';
 import '/flutter_flow/flutter_flow_animations.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
@@ -6,7 +7,6 @@ import '/flutter_flow/flutter_flow_widgets.dart';
 import '/index.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
-import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'login_page_model.dart';
 export 'login_page_model.dart';
@@ -112,13 +112,13 @@ class _LoginPageWidgetState extends State<LoginPageWidget>
                   padding: EdgeInsetsDirectional.fromSTEB(0.0, 70.0, 0.0, 32.0),
                   child: Container(
                     width: 200.0,
-                    height: 70.0,
+                    height: 92.88,
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(16.0),
                     ),
                     alignment: AlignmentDirectional(0.0, 0.0),
                     child: Text(
-                      'IMFSL',
+                      '      IMFSL\nStaff Portal',
                       style: FlutterFlowTheme.of(context).displaySmall.override(
                             font: GoogleFonts.interTight(
                               fontWeight: FlutterFlowTheme.of(context)
@@ -170,7 +170,7 @@ class _LoginPageWidgetState extends State<LoginPageWidget>
                           crossAxisAlignment: CrossAxisAlignment.center,
                           children: [
                             Text(
-                              'Welcome Back',
+                              'Karibu tena',
                               textAlign: TextAlign.center,
                               style: FlutterFlowTheme.of(context)
                                   .displaySmall
@@ -196,7 +196,7 @@ class _LoginPageWidgetState extends State<LoginPageWidget>
                               padding: EdgeInsetsDirectional.fromSTEB(
                                   0.0, 12.0, 0.0, 24.0),
                               child: Text(
-                                'Fill out the information below in order to access your account.',
+                                'Jaza maelezo hapa chini ili kufikia akaunti yako.',
                                 textAlign: TextAlign.center,
                                 style: FlutterFlowTheme.of(context)
                                     .labelMedium
@@ -231,7 +231,7 @@ class _LoginPageWidgetState extends State<LoginPageWidget>
                                   autofillHints: [AutofillHints.email],
                                   obscureText: false,
                                   decoration: InputDecoration(
-                                    labelText: 'Email',
+                                    labelText: 'Barua pepe',
                                     labelStyle: FlutterFlowTheme.of(context)
                                         .labelLarge
                                         .override(
@@ -331,7 +331,7 @@ class _LoginPageWidgetState extends State<LoginPageWidget>
                                   autofillHints: [AutofillHints.password],
                                   obscureText: !_model.passwordVisibility,
                                   decoration: InputDecoration(
-                                    labelText: 'Password',
+                                    labelText: 'Neno la siri',
                                     labelStyle: FlutterFlowTheme.of(context)
                                         .labelLarge
                                         .override(
@@ -451,11 +451,35 @@ class _LoginPageWidgetState extends State<LoginPageWidget>
                                     return;
                                   }
 
-                                  context.goNamedAuth(
-                                      HomepagestaffWidget.routeName,
-                                      context.mounted);
+                                  _model.staffData =
+                                      await StaffTable().queryRows(
+                                    queryFn: (q) => q.eqOrNull(
+                                      'user_id',
+                                      currentUserUid,
+                                    ),
+                                  );
+                                  if (_model.staffData
+                                          ?.elementAtOrNull(0)
+                                          ?.onboardingComplete ==
+                                      true) {
+                                    if (Navigator.of(context).canPop()) {
+                                      context.pop();
+                                    }
+                                    context.pushNamedAuth(
+                                        HomepagestaffWidget.routeName,
+                                        context.mounted);
+                                  } else {
+                                    if (Navigator.of(context).canPop()) {
+                                      context.pop();
+                                    }
+                                    context.pushNamedAuth(
+                                        UsajiliWidget.routeName,
+                                        context.mounted);
+                                  }
+
+                                  safeSetState(() {});
                                 },
-                                text: 'Sign In',
+                                text: 'Ingia',
                                 options: FFButtonOptions(
                                   width: double.infinity,
                                   height: 44.0,
@@ -494,213 +518,66 @@ class _LoginPageWidgetState extends State<LoginPageWidget>
                                 ),
                               ),
                             ),
-                            Padding(
-                              padding: EdgeInsetsDirectional.fromSTEB(
-                                  16.0, 0.0, 16.0, 24.0),
-                              child: Text(
-                                'Or sign in with',
-                                textAlign: TextAlign.center,
-                                style: FlutterFlowTheme.of(context)
-                                    .labelMedium
-                                    .override(
-                                      font: GoogleFonts.inter(
-                                        fontWeight: FlutterFlowTheme.of(context)
-                                            .labelMedium
-                                            .fontWeight,
-                                        fontStyle: FlutterFlowTheme.of(context)
-                                            .labelMedium
-                                            .fontStyle,
-                                      ),
-                                      letterSpacing: 0.0,
-                                      fontWeight: FlutterFlowTheme.of(context)
-                                          .labelMedium
-                                          .fontWeight,
-                                      fontStyle: FlutterFlowTheme.of(context)
-                                          .labelMedium
-                                          .fontStyle,
-                                    ),
-                              ),
-                            ),
-                            Padding(
-                              padding: EdgeInsetsDirectional.fromSTEB(
-                                  0.0, 0.0, 0.0, 16.0),
-                              child: FFButtonWidget(
-                                onPressed: () async {
-                                  GoRouter.of(context).prepareAuthEvent();
-
-                                  final user =
-                                      await authManager.signInWithEmail(
-                                    context,
-                                    _model.emailAddressTextController.text,
-                                    _model.passwordTextController.text,
-                                  );
-                                  if (user == null) {
-                                    return;
-                                  }
-
-                                  context.goNamedAuth(
-                                      HomepagestaffWidget.routeName,
-                                      context.mounted);
-                                },
-                                text: 'Continue with Google',
-                                icon: FaIcon(
-                                  FontAwesomeIcons.google,
-                                  size: 20.0,
-                                ),
-                                options: FFButtonOptions(
-                                  width: double.infinity,
-                                  height: 44.0,
-                                  padding: EdgeInsetsDirectional.fromSTEB(
-                                      0.0, 0.0, 0.0, 0.0),
-                                  iconPadding: EdgeInsetsDirectional.fromSTEB(
-                                      0.0, 0.0, 0.0, 0.0),
-                                  color: FlutterFlowTheme.of(context)
-                                      .secondaryBackground,
-                                  textStyle: FlutterFlowTheme.of(context)
-                                      .titleSmall
-                                      .override(
-                                        font: GoogleFonts.interTight(
-                                          fontWeight:
-                                              FlutterFlowTheme.of(context)
-                                                  .titleSmall
-                                                  .fontWeight,
-                                          fontStyle:
-                                              FlutterFlowTheme.of(context)
-                                                  .titleSmall
-                                                  .fontStyle,
-                                        ),
-                                        color: FlutterFlowTheme.of(context)
-                                            .primaryText,
-                                        letterSpacing: 0.0,
-                                        fontWeight: FlutterFlowTheme.of(context)
-                                            .titleSmall
-                                            .fontWeight,
-                                        fontStyle: FlutterFlowTheme.of(context)
-                                            .titleSmall
-                                            .fontStyle,
-                                      ),
-                                  elevation: 0.0,
-                                  borderSide: BorderSide(
-                                    color: FlutterFlowTheme.of(context)
-                                        .primaryBackground,
-                                    width: 2.0,
-                                  ),
-                                  borderRadius: BorderRadius.circular(12.0),
-                                  hoverColor: FlutterFlowTheme.of(context)
-                                      .primaryBackground,
-                                ),
-                              ),
-                            ),
-                            Padding(
-                              padding: EdgeInsetsDirectional.fromSTEB(
-                                  0.0, 0.0, 0.0, 16.0),
-                              child: FFButtonWidget(
-                                onPressed: () async {
-                                  GoRouter.of(context).prepareAuthEvent();
-
-                                  final user =
-                                      await authManager.signInWithEmail(
-                                    context,
-                                    _model.emailAddressTextController.text,
-                                    _model.passwordTextController.text,
-                                  );
-                                  if (user == null) {
-                                    return;
-                                  }
-
-                                  context.goNamedAuth(
-                                      HomepagestaffWidget.routeName,
-                                      context.mounted);
-                                },
-                                text: 'Continue with Apple',
-                                icon: FaIcon(
-                                  FontAwesomeIcons.apple,
-                                  size: 20.0,
-                                ),
-                                options: FFButtonOptions(
-                                  width: double.infinity,
-                                  height: 44.0,
-                                  padding: EdgeInsetsDirectional.fromSTEB(
-                                      0.0, 0.0, 0.0, 0.0),
-                                  iconPadding: EdgeInsetsDirectional.fromSTEB(
-                                      0.0, 0.0, 0.0, 0.0),
-                                  color: FlutterFlowTheme.of(context)
-                                      .secondaryBackground,
-                                  textStyle: FlutterFlowTheme.of(context)
-                                      .titleSmall
-                                      .override(
-                                        font: GoogleFonts.interTight(
-                                          fontWeight:
-                                              FlutterFlowTheme.of(context)
-                                                  .titleSmall
-                                                  .fontWeight,
-                                          fontStyle:
-                                              FlutterFlowTheme.of(context)
-                                                  .titleSmall
-                                                  .fontStyle,
-                                        ),
-                                        color: FlutterFlowTheme.of(context)
-                                            .primaryText,
-                                        letterSpacing: 0.0,
-                                        fontWeight: FlutterFlowTheme.of(context)
-                                            .titleSmall
-                                            .fontWeight,
-                                        fontStyle: FlutterFlowTheme.of(context)
-                                            .titleSmall
-                                            .fontStyle,
-                                      ),
-                                  elevation: 0.0,
-                                  borderSide: BorderSide(
-                                    color: FlutterFlowTheme.of(context)
-                                        .primaryBackground,
-                                    width: 2.0,
-                                  ),
-                                  borderRadius: BorderRadius.circular(12.0),
-                                  hoverColor: FlutterFlowTheme.of(context)
-                                      .primaryBackground,
-                                ),
-                              ),
-                            ),
 
                             // You will have to add an action on this rich text to go to your login page.
                             Padding(
                               padding: EdgeInsetsDirectional.fromSTEB(
                                   0.0, 12.0, 0.0, 12.0),
-                              child: RichText(
-                                textScaler: MediaQuery.of(context).textScaler,
-                                text: TextSpan(
-                                  children: [
-                                    TextSpan(
-                                      text: 'Don\'t have an account?  ',
-                                      style: TextStyle(),
-                                    ),
-                                    TextSpan(
-                                      text: 'Sign Up here',
-                                      style: FlutterFlowTheme.of(context)
-                                          .bodyMedium
-                                          .override(
-                                            font: GoogleFonts.inter(
+                              child: InkWell(
+                                splashColor: Colors.transparent,
+                                focusColor: Colors.transparent,
+                                hoverColor: Colors.transparent,
+                                highlightColor: Colors.transparent,
+                                onTap: () async {
+                                  context
+                                      .pushNamed(SignupSignupWidget.routeName);
+                                },
+                                child: RichText(
+                                  textScaler: MediaQuery.of(context).textScaler,
+                                  text: TextSpan(
+                                    children: [
+                                      TextSpan(
+                                        text: 'Je, huna akaunti? ',
+                                        style: TextStyle(),
+                                      ),
+                                      TextSpan(
+                                        text: 'Jisajili hapa',
+                                        style: FlutterFlowTheme.of(context)
+                                            .bodyMedium
+                                            .override(
+                                              font: GoogleFonts.inter(
+                                                fontWeight: FontWeight.w600,
+                                                fontStyle:
+                                                    FlutterFlowTheme.of(context)
+                                                        .bodyMedium
+                                                        .fontStyle,
+                                              ),
+                                              color:
+                                                  FlutterFlowTheme.of(context)
+                                                      .primary,
+                                              letterSpacing: 0.0,
                                               fontWeight: FontWeight.w600,
                                               fontStyle:
                                                   FlutterFlowTheme.of(context)
                                                       .bodyMedium
                                                       .fontStyle,
                                             ),
-                                            color: FlutterFlowTheme.of(context)
-                                                .primary,
-                                            letterSpacing: 0.0,
-                                            fontWeight: FontWeight.w600,
+                                      )
+                                    ],
+                                    style: FlutterFlowTheme.of(context)
+                                        .bodyMedium
+                                        .override(
+                                          font: GoogleFonts.inter(
+                                            fontWeight:
+                                                FlutterFlowTheme.of(context)
+                                                    .bodyMedium
+                                                    .fontWeight,
                                             fontStyle:
                                                 FlutterFlowTheme.of(context)
                                                     .bodyMedium
                                                     .fontStyle,
                                           ),
-                                    )
-                                  ],
-                                  style: FlutterFlowTheme.of(context)
-                                      .bodyMedium
-                                      .override(
-                                        font: GoogleFonts.inter(
+                                          letterSpacing: 0.0,
                                           fontWeight:
                                               FlutterFlowTheme.of(context)
                                                   .bodyMedium
@@ -710,14 +587,7 @@ class _LoginPageWidgetState extends State<LoginPageWidget>
                                                   .bodyMedium
                                                   .fontStyle,
                                         ),
-                                        letterSpacing: 0.0,
-                                        fontWeight: FlutterFlowTheme.of(context)
-                                            .bodyMedium
-                                            .fontWeight,
-                                        fontStyle: FlutterFlowTheme.of(context)
-                                            .bodyMedium
-                                            .fontStyle,
-                                      ),
+                                  ),
                                 ),
                               ),
                             ),

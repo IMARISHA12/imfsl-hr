@@ -1,3 +1,4 @@
+import '/backend/supabase/supabase.dart';
 import '/flutter_flow/flutter_flow_util.dart';
 import '/index.dart';
 import 'login_page_widget.dart' show LoginPageWidget;
@@ -15,6 +16,8 @@ class LoginPageModel extends FlutterFlowModel<LoginPageWidget> {
   TextEditingController? passwordTextController;
   late bool passwordVisibility;
   String? Function(BuildContext, String?)? passwordTextControllerValidator;
+  // Stores action output result for [Backend Call - Query Rows] action in Button widget.
+  List<StaffRow>? staffData;
 
   @override
   void initState(BuildContext context) {

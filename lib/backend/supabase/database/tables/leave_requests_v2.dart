@@ -38,4 +38,46 @@ class LeaveRequestsV2Row extends SupabaseDataRow {
 
   String? get approvedBy => getField<String>('approved_by');
   set approvedBy(String? value) => setField<String>('approved_by', value);
+
+  int? get totalDays => getField<int>('total_days');
+  set totalDays(int? value) => setField<int>('total_days', value);
+
+  String? get attachmentUrl => getField<String>('attachment_url');
+  set attachmentUrl(String? value) => setField<String>('attachment_url', value);
+
+  DateTime? get createdAt => getField<DateTime>('created_at');
+  set createdAt(DateTime? value) => setField<DateTime>('created_at', value);
+
+  DateTime? get reviewedAt => getField<DateTime>('reviewed_at');
+  set reviewedAt(DateTime? value) => setField<DateTime>('reviewed_at', value);
+
+  String? get reviewerComments => getField<String>('reviewer_comments');
+  set reviewerComments(String? value) =>
+      setField<String>('reviewer_comments', value);
+
+  DateTime? get photoCapturedAt => getField<DateTime>('photo_captured_at');
+  set photoCapturedAt(DateTime? value) =>
+      setField<DateTime>('photo_captured_at', value);
+
+  double? get captureLatitude => getField<double>('capture_latitude');
+  set captureLatitude(double? value) =>
+      setField<double>('capture_latitude', value);
+
+  double? get captureLongitude => getField<double>('capture_longitude');
+  set captureLongitude(double? value) =>
+      setField<double>('capture_longitude', value);
+
+  bool? get documentVerified => getField<bool>('document_verified');
+  set documentVerified(bool? value) =>
+      setField<bool>('document_verified', value);
+
+  String? get verificationNotes => getField<String>('verification_notes');
+  set verificationNotes(String? value) =>
+      setField<String>('verification_notes', value);
+
+  bool? get isFlagged => getField<bool>('is_flagged');
+  set isFlagged(bool? value) => setField<bool>('is_flagged', value);
+
+  String? get flagReason => getField<String>('flag_reason');
+  set flagReason(String? value) => setField<String>('flag_reason', value);
 }

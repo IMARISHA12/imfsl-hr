@@ -225,8 +225,8 @@ dynamic deserializeParam<T>(
             return LegalCasesRow(data);
           case StaffPerformanceMetricsRow:
             return StaffPerformanceMetricsRow(data);
-          case MvExecParSignalRow:
-            return MvExecParSignalRow(data);
+          case FinBorrowersRow:
+            return FinBorrowersRow(data);
           case ZArchiveAssetCategoriesRow:
             return ZArchiveAssetCategoriesRow(data);
           case StaffBadgesRow:
@@ -257,8 +257,6 @@ dynamic deserializeParam<T>(
             return ZArchivePerfMetricsRow(data);
           case VUnifiedNotificationsRow:
             return VUnifiedNotificationsRow(data);
-          case VPendingReversalsByBranchRow:
-            return VPendingReversalsByBranchRow(data);
           case ZArchiveAwardTypesRow:
             return ZArchiveAwardTypesRow(data);
           case StaffDisciplinaryActionsRow:
@@ -301,6 +299,8 @@ dynamic deserializeParam<T>(
             return ZArchiveSecurityPlaybooksRow(data);
           case LoanRestructuringHistoryRow:
             return LoanRestructuringHistoryRow(data);
+          case LeaveBalanceRow:
+            return LeaveBalanceRow(data);
           case FbiAlertsRow:
             return FbiAlertsRow(data);
           case SystemPulseMetricsRow:
@@ -427,14 +427,10 @@ dynamic deserializeParam<T>(
             return AlertRulesRow(data);
           case PaymentsReversalsRow:
             return PaymentsReversalsRow(data);
-          case ViewLiquidityForecastRow:
-            return ViewLiquidityForecastRow(data);
           case AiFraudDetectionRow:
             return AiFraudDetectionRow(data);
           case ZArchiveMvRefreshStatusRow:
             return ZArchiveMvRefreshStatusRow(data);
-          case VCollateralSummaryRow:
-            return VCollateralSummaryRow(data);
           case SodViolationsRow:
             return SodViolationsRow(data);
           case AiInsightsRow:
@@ -445,6 +441,8 @@ dynamic deserializeParam<T>(
             return CustomerSurveysRow(data);
           case RoomMessagesDemoRow:
             return RoomMessagesDemoRow(data);
+          case RepaymentsRow:
+            return RepaymentsRow(data);
           case VGovernanceSummaryRow:
             return VGovernanceSummaryRow(data);
           case PayrollRunsRow:
@@ -483,8 +481,6 @@ dynamic deserializeParam<T>(
             return CollateralStatusHistoryRow(data);
           case ProfilesRow:
             return ProfilesRow(data);
-          case SecureEmployeeViewRow:
-            return SecureEmployeeViewRow(data);
           case CollectionMessagesRow:
             return CollectionMessagesRow(data);
           case ZArchiveAnalyticsEventsRow:
@@ -507,8 +503,6 @@ dynamic deserializeParam<T>(
             return AiDecisionsRow(data);
           case TestReadonlyOkRow:
             return TestReadonlyOkRow(data);
-          case VLoanPipelineAnalyticsRow:
-            return VLoanPipelineAnalyticsRow(data);
           case InternalBillsRow:
             return InternalBillsRow(data);
           case StaffActivityStreamRow:
@@ -539,8 +533,6 @@ dynamic deserializeParam<T>(
             return AiStrategicInsightsRow(data);
           case StaffPerformanceMonthlyRow:
             return StaffPerformanceMonthlyRow(data);
-          case ProfilesItAdminSafeRow:
-            return ProfilesItAdminSafeRow(data);
           case LoanWriteoffRequestsRow:
             return LoanWriteoffRequestsRow(data);
           case LicenseTypesRow:
@@ -561,6 +553,8 @@ dynamic deserializeParam<T>(
             return VJournalBalancesRow(data);
           case GovernmentLoanEventsRow:
             return GovernmentLoanEventsRow(data);
+          case FinValuationsRow:
+            return FinValuationsRow(data);
           case CollectionEscalationsRow:
             return CollectionEscalationsRow(data);
           case BillingPaymentsRow:
@@ -581,8 +575,8 @@ dynamic deserializeParam<T>(
             return DocumentOcrResultsRow(data);
           case StaffRow:
             return StaffRow(data);
-          case MvAdminCountsRow:
-            return MvAdminCountsRow(data);
+          case FlaggedLeaveRequestsRow:
+            return FlaggedLeaveRequestsRow(data);
           case GpsDevicesRow:
             return GpsDevicesRow(data);
           case AuditPartitionStatusRow:
@@ -603,6 +597,8 @@ dynamic deserializeParam<T>(
             return ZArchiveTaxRulesRow(data);
           case SystemEventsRow:
             return SystemEventsRow(data);
+          case LeavePolicyRow:
+            return LeavePolicyRow(data);
           case ZArchiveApprovalLevelsRow:
             return ZArchiveApprovalLevelsRow(data);
           case ZArchivePiiFieldMappingsRow:
@@ -641,8 +637,6 @@ dynamic deserializeParam<T>(
             return ReminderRulesRow(data);
           case AttendanceLogsRow:
             return AttendanceLogsRow(data);
-          case LeaveRequestsRow:
-            return LeaveRequestsRow(data);
           case EmployeeQualificationsRow:
             return EmployeeQualificationsRow(data);
           case InsurancePoliciesNewRow:
@@ -659,18 +653,16 @@ dynamic deserializeParam<T>(
             return CustomerTrustScoresRow(data);
           case PermissionsRow:
             return PermissionsRow(data);
-          case MvExecCollectionsDisbursementsRow:
-            return MvExecCollectionsDisbursementsRow(data);
           case ViewDailyTrialBalanceRow:
             return ViewDailyTrialBalanceRow(data);
           case KycVerificationsRow:
             return KycVerificationsRow(data);
           case ScheduledReportSettingsRow:
             return ScheduledReportSettingsRow(data);
-          case ProfilesManagerSafeRow:
-            return ProfilesManagerSafeRow(data);
           case MvExecRiskZonesRow:
             return MvExecRiskZonesRow(data);
+          case LoanTransactionsRow:
+            return LoanTransactionsRow(data);
           case LeaveBalancesRow:
             return LeaveBalancesRow(data);
           case EmployeesSecureRow:
@@ -691,8 +683,6 @@ dynamic deserializeParam<T>(
             return AlertBaselinesRow(data);
           case SmartServiceRequestsRow:
             return SmartServiceRequestsRow(data);
-          case VLoanProcessingByOfficerRow:
-            return VLoanProcessingByOfficerRow(data);
           case StaffPerformanceDailyRow:
             return StaffPerformanceDailyRow(data);
           case VGovernanceTopUsersRow:
@@ -751,6 +741,8 @@ dynamic deserializeParam<T>(
             return CollectionTemplatesRow(data);
           case DepartmentsRow:
             return DepartmentsRow(data);
+          case FinLegalConsoleRow:
+            return FinLegalConsoleRow(data);
           case SystemAuditLogsRow:
             return SystemAuditLogsRow(data);
           case KpiAssignmentsRow:
@@ -809,6 +801,8 @@ dynamic deserializeParam<T>(
             return PaymentBatchesRow(data);
           case PartnerTermsAcknowledgmentsRow:
             return PartnerTermsAcknowledgmentsRow(data);
+          case BorrowersRow:
+            return BorrowersRow(data);
           case JournalLinesRow:
             return JournalLinesRow(data);
           case GovernanceAlertTrendsWeeklyRow:
@@ -817,8 +811,8 @@ dynamic deserializeParam<T>(
             return GovernmentEmployeesCacheRow(data);
           case LeaveRequestsV2Row:
             return LeaveRequestsV2Row(data);
-          case LeaveTypesRow:
-            return LeaveTypesRow(data);
+          case FinCollateralVehiclesRow:
+            return FinCollateralVehiclesRow(data);
           case ZArchiveN8nWorkflowsRow:
             return ZArchiveN8nWorkflowsRow(data);
           case ComplianceExecutionsRow:
@@ -831,6 +825,8 @@ dynamic deserializeParam<T>(
             return LoanRepaymentsRow(data);
           case ZArchiveSystemConfigurationsRow:
             return ZArchiveSystemConfigurationsRow(data);
+          case FinIotTrackingRow:
+            return FinIotTrackingRow(data);
           case CollateralAssetsRow:
             return CollateralAssetsRow(data);
           case ProcurementThresholdsRow:
@@ -839,8 +835,6 @@ dynamic deserializeParam<T>(
             return LoanEventsRow(data);
           case ZArchivePolicyBackupUserGovernanceRolesRow:
             return ZArchivePolicyBackupUserGovernanceRolesRow(data);
-          case VOverdueLoansSummaryRow:
-            return VOverdueLoansSummaryRow(data);
           case VendorContractIntelligenceRow:
             return VendorContractIntelligenceRow(data);
           case ZArchiveSecurityIncidentWorkflowsRow:
@@ -877,6 +871,8 @@ dynamic deserializeParam<T>(
             return ZArchiveSecurityDefinerAllowlistRow(data);
           case ForensicRecoveryCasesRow:
             return ForensicRecoveryCasesRow(data);
+          case FinLoansRow:
+            return FinLoansRow(data);
           case JournalsRow:
             return JournalsRow(data);
           case ZArchiveMonitoringThresholdsRow:
@@ -911,8 +907,6 @@ dynamic deserializeParam<T>(
             return VMvRefreshOverviewRow(data);
           case PendingCriticalTaskResponsesRow:
             return PendingCriticalTaskResponsesRow(data);
-          case VLoansAuditRow:
-            return VLoansAuditRow(data);
           case DocumentsRow:
             return DocumentsRow(data);
           case OrganizationMembersRow:
@@ -997,6 +991,8 @@ dynamic deserializeParam<T>(
             return SodRulesRow(data);
           case StaffBehaviorAnomaliesRow:
             return StaffBehaviorAnomaliesRow(data);
+          case FinTransactionsRow:
+            return FinTransactionsRow(data);
           case ZArchivePositionsRow:
             return ZArchivePositionsRow(data);
           case JournalEntriesRow:
@@ -1019,8 +1015,6 @@ dynamic deserializeParam<T>(
             return ExecutiveCollectionTargetsRow(data);
           case ZArchiveHrReviewQuestionBankRow:
             return ZArchiveHrReviewQuestionBankRow(data);
-          case VLoanStageFunnelRow:
-            return VLoanStageFunnelRow(data);
           case ZArchiveRlsPolicyBackupRow:
             return ZArchiveRlsPolicyBackupRow(data);
           case AnalyticsSummaryRow:
@@ -1037,8 +1031,6 @@ dynamic deserializeParam<T>(
             return HealthCheckReportsRow(data);
           case TopDeniedIps24hRow:
             return TopDeniedIps24hRow(data);
-          case CustomerActiveLoanBalanceRow:
-            return CustomerActiveLoanBalanceRow(data);
           case NotificationsRow:
             return NotificationsRow(data);
           case ZArchiveEmailTemplatesRow:
