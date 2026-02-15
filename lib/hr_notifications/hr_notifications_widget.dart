@@ -166,9 +166,9 @@ class _HrNotificationsWidgetState extends State<HrNotificationsWidget> {
   Widget _buildNotificationTile(
       BuildContext context, Map<String, dynamic> n) {
     final isRead = n['is_read'] == true;
-    final eventType = n['type'] as String? ?? '';
+    final eventType = n['event_type'] as String? ?? '';
     final title = n['title'] as String? ?? '';
-    final body = n['message'] as String? ?? '';
+    final body = n['body'] as String? ?? '';
     final createdAt = n['created_at'] as String? ?? '';
 
     final iconMap = {

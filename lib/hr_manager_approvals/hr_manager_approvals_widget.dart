@@ -124,7 +124,7 @@ class _HrManagerApprovalsWidgetState extends State<HrManagerApprovalsWidget> {
 
   Widget _buildRequestCard(BuildContext context, Map<String, dynamic> req) {
     final leaveType = req['leave_type'] ?? '';
-    final employeeName = req['staff_name'] ?? 'N/A';
+    final employeeName = req['full_name'] ?? 'N/A';
     final startDate = _formatDate(req['start_date']);
     final endDate = _formatDate(req['end_date']);
     final dtStart = DateTime.tryParse(req['start_date']?.toString() ?? '');
