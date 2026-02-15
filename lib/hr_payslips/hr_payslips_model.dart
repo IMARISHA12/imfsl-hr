@@ -15,6 +15,9 @@ class HrPayslipsModel extends FlutterFlowModel<HrPayslipsWidget> {
   /// Loading state.
   bool isLoading = true;
 
+  /// Error message to display.
+  String? errorMessage;
+
   /// Selected payslip for detail view.
   Map<String, dynamic>? selectedPayslip;
 

@@ -18,6 +18,9 @@ class HrAttendanceModel extends FlutterFlowModel<HrAttendanceWidget> {
   /// Loading state.
   bool isLoading = true;
 
+  /// Error message to display.
+  String? errorMessage;
+
   /// Prevents double-tap on clock in/out buttons.
   bool isSubmitting = false;
 

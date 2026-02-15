@@ -290,8 +290,23 @@ class _HomepagestaffWidgetState extends State<HomepagestaffWidget> {
                                 ),
                                 FFButtonWidget(
                                   onPressed: () async {
+                                    // Resolve staff_id from user_id before inserting
+                                    String staffId = currentUserUid;
+                                    final staffRows = await StaffTable().queryRows(
+                                      queryFn: (q) => q.eqOrNull('user_id', currentUserUid).limit(1),
+                                    );
+                                    if (staffRows.isNotEmpty) {
+                                      staffId = staffRows.first.id;
+                                    } else {
+                                      final empRows = await EmployeesTable().queryRows(
+                                        queryFn: (q) => q.eqOrNull('user_id', currentUserUid).limit(1),
+                                      );
+                                      if (empRows.isNotEmpty) {
+                                        staffId = empRows.first.id;
+                                      }
+                                    }
                                     await StaffAttendanceV3Table().insert({
-                                      'staff_id': currentUserUid,
+                                      'staff_id': staffId,
                                       'work_date': supaSerialize<DateTime>(
                                           getCurrentTimestamp),
                                       'clock_in_time': supaSerialize<DateTime>(

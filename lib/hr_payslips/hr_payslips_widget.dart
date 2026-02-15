@@ -57,6 +57,7 @@ class _HrPayslipsWidgetState extends State<HrPayslipsWidget>
   Future<void> _loadData() async {
     if (_employeeId == null) {
       _model.isLoading = false;
+      _model.errorMessage = 'Akaunti yako haijapatikana. Wasiliana na HR.';
       safeSetState(() {});
       return;
     }
@@ -128,6 +129,25 @@ class _HrPayslipsWidgetState extends State<HrPayslipsWidget>
                   ),
                 ),
               )
+            : _model.errorMessage != null
+                ? Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(32.0),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Icon(Icons.error_outline,
+                              size: 48.0, color: Color(0xFFEF4444)),
+                          const SizedBox(height: 16.0),
+                          Text(
+                            _model.errorMessage!,
+                            textAlign: TextAlign.center,
+                            style: FlutterFlowTheme.of(context).bodyMedium,
+                          ),
+                        ],
+                      ),
+                    ),
+                  )
             : TabBarView(
                 controller: _tabController,
                 children: [

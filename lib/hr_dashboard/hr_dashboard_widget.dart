@@ -70,34 +70,38 @@ class _HrDashboardWidgetState extends State<HrDashboardWidget> {
         HrService.instance.getUnreadNotificationCount(uid),                                      // 8: unread count
       ]);
 
-      final activeStaff = (results[0] as List).length;
-      final pendingLeaveCount = (results[1] as List).length;
-      final todayAttCount = (results[2] as List).length;
-      final newHires = (results[3] as List).length;
-      final onLeaveToday = (results[4] as List).length;
+      final activeStaff = (results[0] is List) ? (results[0] as List).length : 0;
+      final pendingLeaveCount = (results[1] is List) ? (results[1] as List).length : 0;
+      final todayAttCount = (results[2] is List) ? (results[2] as List).length : 0;
+      final newHires = (results[3] is List) ? (results[3] as List).length : 0;
+      final onLeaveToday = (results[4] is List) ? (results[4] as List).length : 0;
 
       // Calculate payroll from salary_structures
-      final salaries = results[5] as List;
+      final salaries = (results[5] is List) ? results[5] as List : [];
       double totalCost = 0;
       for (final s in salaries) {
-        totalCost += ((s as Map)['gross_salary'] as num?)?.toDouble() ?? 0;
+        if (s is Map) {
+          totalCost += (s['gross_salary'] as num?)?.toDouble() ?? 0;
+        }
       }
       final avgSalary = salaries.isNotEmpty ? totalCost / salaries.length : 0.0;
 
       // Calculate avg performance score
-      final perfRecords = results[6] as List;
+      final perfRecords = (results[6] is List) ? results[6] as List : [];
       double avgScore = 0;
       if (perfRecords.isNotEmpty) {
         double total = 0;
         int count = 0;
         for (final p in perfRecords) {
-          final score = (p as Map)['overall_score'] as num?;
-          if (score != null) { total += score; count++; }
+          if (p is Map) {
+            final score = p['overall_score'] as num?;
+            if (score != null) { total += score; count++; }
+          }
         }
         if (count > 0) avgScore = total / count;
       }
 
-      final expiringContracts = (results[7] as List).length;
+      final expiringContracts = (results[7] is List) ? (results[7] as List).length : 0;
 
       final kpis = <String, dynamic>{
         'headcount': {'active': activeStaff, 'new_hires_this_month': newHires},
@@ -109,7 +113,7 @@ class _HrDashboardWidgetState extends State<HrDashboardWidget> {
       };
 
       _model.kpiData = kpis;
-      _model.unreadCount = results[8] as int;
+      _model.unreadCount = (results[8] is int) ? results[8] as int : 0;
       _model.isLoading = false;
       _model.errorMessage = null;
     } catch (e) {

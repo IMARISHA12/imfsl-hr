@@ -391,8 +391,8 @@ class _HrLeaveWidgetState extends State<HrLeaveWidget>
             value: _model.selectedLeaveTypeId,
             items: _model.leaveTypes
                 .map((lt) => DropdownMenuItem<String>(
-                      value: lt['name'] as String,
-                      child: Text(lt['name'] as String),
+                      value: (lt['name'] ?? lt['code'] ?? '').toString(),
+                      child: Text((lt['name'] ?? lt['code'] ?? '').toString()),
                     ))
                 .toList(),
             onChanged: (val) {

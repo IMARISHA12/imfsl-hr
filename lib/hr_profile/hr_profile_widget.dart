@@ -157,9 +157,9 @@ class _HrProfileWidgetState extends State<HrProfileWidget> {
                         if (_model.salary != null) ...[
                           const SizedBox(height: 14.0),
                           _buildSection(context, 'Mshahara (Sasa)', [
-                            _infoRow('Msingi', 'TZS ${_fmt(_model.salary!['basic_salary'])}'),
-                            _infoRow('Jumla', 'TZS ${_fmt(_model.salary!['gross_salary'])}'),
-                            _infoRow('Tangu', _model.salary!['effective_from']?.toString() ?? '-'),
+                            _infoRow('Msingi', 'TZS ${_fmt(_model.salary?['basic_salary'])}'),
+                            _infoRow('Jumla', 'TZS ${_fmt(_model.salary?['gross_salary'])}'),
+                            _infoRow('Tangu', _model.salary?['effective_from']?.toString() ?? '-'),
                           ]),
                         ],
                         const SizedBox(height: 24.0),
