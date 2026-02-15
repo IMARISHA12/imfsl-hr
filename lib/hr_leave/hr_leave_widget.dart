@@ -154,7 +154,7 @@ class _HrLeaveWidgetState extends State<HrLeaveWidget>
         physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.all(16.0),
         itemCount: _model.balances.length,
-      itemBuilder: (context, index) {
+        itemBuilder: (context, index) {
         final b = _model.balances[index];
         final leaveType =
             (b['leave_types'] as Map<String, dynamic>?)?['name'] ?? 'N/A';
@@ -255,7 +255,7 @@ class _HrLeaveWidgetState extends State<HrLeaveWidget>
         physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.all(16.0),
         itemCount: _model.requests.length,
-      itemBuilder: (context, index) {
+        itemBuilder: (context, index) {
         final r = _model.requests[index];
         final leaveType = r['leave_type'] as String? ?? '';
         final status = r['status'] ?? 'pending';

@@ -189,7 +189,7 @@ class _HrPayslipsWidgetState extends State<HrPayslipsWidget>
       child: SingleChildScrollView(
         physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.all(20.0),
-      child: Column(
+        child: Column(
         children: [
           // Gross salary header
           Container(
@@ -322,7 +322,7 @@ class _HrPayslipsWidgetState extends State<HrPayslipsWidget>
         physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.all(16.0),
         itemCount: _model.payslips.length,
-      itemBuilder: (context, index) {
+        itemBuilder: (context, index) {
         final ps = _model.payslips[index];
         final runs = ps['payroll_runs'] as Map<String, dynamic>? ?? {};
         final status = ps['payment_status'] ?? 'pending';
@@ -534,7 +534,7 @@ class _HrPayslipsWidgetState extends State<HrPayslipsWidget>
         physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.all(16.0),
         itemCount: _model.loans.length,
-      itemBuilder: (context, index) {
+        itemBuilder: (context, index) {
         final loan = _model.loans[index];
         final isActive = loan['status'] == 'active';
         final progress = (loan['remaining_balance'] is num &&
