@@ -74,7 +74,7 @@ class _HrAttendanceWidgetState extends State<HrAttendanceWidget> {
       int daysLate = records.where((r) => r['is_late'] == true).length;
       int totalMinutes = 0;
       for (final r in records) {
-        totalMinutes += (r['work_minutes'] as int?) ?? 0;
+        totalMinutes += ((r['work_minutes'] as num?) ?? 0).toInt();
       }
       final summary = <String, dynamic>{
         'days_present': daysPresent,
@@ -348,7 +348,7 @@ class _HrAttendanceWidgetState extends State<HrAttendanceWidget> {
         const SizedBox(height: 8.0),
         ...(_model.records.map((r) {
           final isLate = r['is_late'] == true;
-          final workMins = r['work_minutes'] as int?;
+          final workMins = (r['work_minutes'] as num?)?.toInt();
           final hours = workMins != null ? (workMins / 60).toStringAsFixed(1) : '-';
           final clockIn = r['clock_in_time'] ?? '-';
           final clockOut = r['clock_out_time'] ?? '-';
