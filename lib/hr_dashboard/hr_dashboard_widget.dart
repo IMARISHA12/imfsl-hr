@@ -48,23 +48,68 @@ class _HrDashboardWidgetState extends State<HrDashboardWidget> {
 
   Future<void> _loadDashboardData() async {
     try {
-      final currentUserUid = SupaFlow.client.auth.currentUser?.id ?? '';
-      // Build KPIs from real tables instead of missing RPC
-      final staffCount = await SupaFlow.client.from('staff').select('id').eq('active', true);
-      final pendingLeaves = await SupaFlow.client.from('leave_requests_v2').select('id').eq('status', 'pending');
-      final todayAttendance = await SupaFlow.client.from('attendance_v2_today').select('id');
-      final totalStaff = (staffCount as List).length;
+      final uid = SupaFlow.client.auth.currentUser?.id ?? '';
+      final now = DateTime.now();
+      final todayStr = now.toIso8601String().split('T')[0];
+      final monthStart = DateTime(now.year, now.month, 1).toIso8601String().split('T')[0];
+      final in30days = now.add(const Duration(days: 30)).toIso8601String().split('T')[0];
+
+      // Run all queries in parallel
+      final results = await Future.wait([
+        SupaFlow.client.from('staff').select('id').eq('active', true),                           // 0: active staff
+        SupaFlow.client.from('leave_requests_v2').select('id').eq('status', 'pending'),          // 1: pending leaves
+        SupaFlow.client.from('attendance_v2_today').select('id'),                                // 2: today attendance
+        SupaFlow.client.from('employees').select('id').gte('hire_date', monthStart),             // 3: new hires this month
+        SupaFlow.client.from('leave_requests_v2').select('id')                                   // 4: on leave today
+            .eq('status', 'approved').lte('start_date', todayStr).gte('end_date', todayStr),
+        SupaFlow.client.from('salary_structures').select('gross_salary').eq('is_current', true), // 5: salaries
+        SupaFlow.client.from('staff_performance_monthly').select('overall_score')                 // 6: performance scores
+            .eq('year', now.year).eq('month', now.month),
+        SupaFlow.client.from('employees').select('id')                                           // 7: expiring contracts
+            .lte('contract_end_date', in30days).gte('contract_end_date', todayStr),
+        HrService.instance.getUnreadNotificationCount(uid),                                      // 8: unread count
+      ]);
+
+      final activeStaff = (results[0] as List).length;
+      final pendingLeaveCount = (results[1] as List).length;
+      final todayAttCount = (results[2] as List).length;
+      final newHires = (results[3] as List).length;
+      final onLeaveToday = (results[4] as List).length;
+
+      // Calculate payroll from salary_structures
+      final salaries = results[5] as List;
+      double totalCost = 0;
+      for (final s in salaries) {
+        totalCost += ((s as Map)['gross_salary'] as num?)?.toDouble() ?? 0;
+      }
+      final avgSalary = salaries.isNotEmpty ? totalCost / salaries.length : 0.0;
+
+      // Calculate avg performance score
+      final perfRecords = results[6] as List;
+      double avgScore = 0;
+      if (perfRecords.isNotEmpty) {
+        double total = 0;
+        int count = 0;
+        for (final p in perfRecords) {
+          final score = (p as Map)['overall_score'] as num?;
+          if (score != null) { total += score; count++; }
+        }
+        if (count > 0) avgScore = total / count;
+      }
+
+      final expiringContracts = (results[7] as List).length;
+
       final kpis = <String, dynamic>{
-        'headcount': {'active': totalStaff, 'new_hires_this_month': 0},
-        'attendance': {'rate_this_month': totalStaff > 0 ? (todayAttendance as List).length * 100 ~/ totalStaff : 0},
-        'leave': {'pending_requests': (pendingLeaves as List).length, 'on_leave_today': 0},
-        'performance': {'avg_score': 0, 'pending_reviews': 0},
-        'payroll': {'monthly_cost': 0, 'avg_salary': 0},
-        'alerts': {'expiring_contracts': 0},
+        'headcount': {'active': activeStaff, 'new_hires_this_month': newHires},
+        'attendance': {'rate_this_month': activeStaff > 0 ? todayAttCount * 100 ~/ activeStaff : 0},
+        'leave': {'pending_requests': pendingLeaveCount, 'on_leave_today': onLeaveToday},
+        'performance': {'avg_score': avgScore.round(), 'pending_reviews': 0},
+        'payroll': {'monthly_cost': totalCost, 'avg_salary': avgSalary},
+        'alerts': {'expiring_contracts': expiringContracts},
       };
-      final unread = await HrService.instance.getUnreadNotificationCount(currentUserUid);
+
       _model.kpiData = kpis;
-      _model.unreadCount = unread;
+      _model.unreadCount = results[8] as int;
       _model.isLoading = false;
       _model.errorMessage = null;
     } catch (e) {

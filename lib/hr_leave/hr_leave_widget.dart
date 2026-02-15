@@ -50,13 +50,8 @@ class _HrLeaveWidgetState extends State<HrLeaveWidget>
       _model.requests =
           await HrService.instance.getMyLeaveRequests(currentUserUid);
 
-      // Load leave types for the request form (REAL table columns)
-      final types = await SupaFlow.client
-          .from('leave_types')
-          .select('id, code, name, days_allowed')
-          .order('name');
-
-      _model.leaveTypes = List<Map<String, dynamic>>.from(types);
+      // Load leave types for the request form
+      _model.leaveTypes = await HrService.instance.getLeaveTypes();
       _model.isLoading = false;
     } catch (e) {
       _model.isLoading = false;
