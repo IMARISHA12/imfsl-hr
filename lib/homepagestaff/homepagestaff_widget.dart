@@ -45,6 +45,7 @@ class _HomepagestaffWidgetState extends State<HomepagestaffWidget> {
   void initState() {
     super.initState();
     _model = createModel(context, () => HomepagestaffModel());
+    _model.currentRealTime = DateTime.now();
 
     // On page load action.
     SchedulerBinding.instance.addPostFrameCallback((_) async {
@@ -56,8 +57,7 @@ class _HomepagestaffWidgetState extends State<HomepagestaffWidget> {
       _model.instantTimer = InstantTimer.periodic(
         duration: Duration(milliseconds: 1000),
         callback: (timer) async {
-          _model.currentRealTime = _model.currentRealTime;
-          _model.clockInTime = _model.clockInTime;
+          _model.currentRealTime = DateTime.now();
           safeSetState(() {});
         },
         startImmediately: true,

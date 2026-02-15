@@ -237,7 +237,6 @@ class _HrPayslipsWidgetState extends State<HrPayslipsWidget>
           ]),
         ],
       ),
-      ),
     );
   }
 

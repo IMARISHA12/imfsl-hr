@@ -11,7 +11,7 @@ class HomepagestaffModel extends FlutterFlowModel<HomepagestaffWidget> {
 
   String? currentStaffName;
 
-  bool isClockedIn = true;
+  bool isClockedIn = false;
 
   DateTime? clockInTime;
 
