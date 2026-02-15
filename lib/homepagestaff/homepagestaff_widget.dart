@@ -51,6 +51,8 @@ class _HomepagestaffWidgetState extends State<HomepagestaffWidget> {
       if (currentUserUid == '') {
         context.pushNamed(LoginPageWidget.routeName);
       }
+      // Check if already clocked in today
+      await _checkTodayAttendance();
       _model.instantTimer = InstantTimer.periodic(
         duration: Duration(milliseconds: 1000),
         callback: (timer) async {
@@ -61,6 +63,47 @@ class _HomepagestaffWidgetState extends State<HomepagestaffWidget> {
         startImmediately: true,
       );
     });
+  }
+
+  /// Check if the user has already clocked in today.
+  Future<void> _checkTodayAttendance() async {
+    try {
+      final todayStr = DateTime.now().toIso8601String().split('T')[0];
+      // Resolve staff_id
+      String staffId = currentUserUid;
+      final staffRows = await StaffTable().queryRows(
+        queryFn: (q) => q.eqOrNull('user_id', currentUserUid).limit(1),
+      );
+      if (staffRows.isNotEmpty) {
+        staffId = staffRows.first.id;
+        _model.currentStaffId = staffId;
+      } else {
+        final empRows = await EmployeesTable().queryRows(
+          queryFn: (q) => q.eqOrNull('user_id', currentUserUid).limit(1),
+        );
+        if (empRows.isNotEmpty) {
+          staffId = empRows.first.id;
+          _model.currentStaffId = staffId;
+        }
+      }
+      final today = await SupaFlow.client
+          .from('staff_attendance_v3')
+          .select('id, clock_in_time')
+          .eq('staff_id', staffId)
+          .eq('work_date', todayStr)
+          .maybeSingle();
+      _model.isClockedIn = today != null;
+      if (today != null) {
+        final raw = today['clock_in_time'];
+        if (raw != null) {
+          _model.clockInTime = DateTime.tryParse(raw.toString());
+        }
+      }
+    } catch (_) {
+      // Default to false so button is usable even if check fails
+      _model.isClockedIn = false;
+    }
+    safeSetState(() {});
   }
 
   @override
@@ -292,21 +335,8 @@ class _HomepagestaffWidgetState extends State<HomepagestaffWidget> {
                                   onPressed: () async {
                                     if (_model.isClockedIn) return;
                                     try {
-                                      // Resolve staff_id from user_id before inserting
-                                      String staffId = currentUserUid;
-                                      final staffRows = await StaffTable().queryRows(
-                                        queryFn: (q) => q.eqOrNull('user_id', currentUserUid).limit(1),
-                                      );
-                                      if (staffRows.isNotEmpty) {
-                                        staffId = staffRows.first.id;
-                                      } else {
-                                        final empRows = await EmployeesTable().queryRows(
-                                          queryFn: (q) => q.eqOrNull('user_id', currentUserUid).limit(1),
-                                        );
-                                        if (empRows.isNotEmpty) {
-                                          staffId = empRows.first.id;
-                                        }
-                                      }
+                                      // Use cached staff_id from _checkTodayAttendance, or resolve fresh
+                                      final staffId = _model.currentStaffId ?? currentUserUid;
                                       await StaffAttendanceV3Table().insert({
                                         'staff_id': staffId,
                                         'work_date': supaSerialize<DateTime>(
