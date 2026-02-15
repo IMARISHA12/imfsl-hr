@@ -460,12 +460,12 @@ class _HomepagestaffWidgetState extends State<HomepagestaffWidget> {
                                     crossAxisAlignment:
                                         CrossAxisAlignment.center,
                                     children: [
-                                      FutureBuilder<List<AttendanceRecordsRow>>(
+                                      FutureBuilder<List<StaffAttendanceV3Row>>(
                                         future:
-                                            AttendanceRecordsTable().queryRows(
+                                            StaffAttendanceV3Table().queryRows(
                                           queryFn: (q) => q.eqOrNull(
                                             'staff_id',
-                                            currentUserUid,
+                                            _model.currentStaffId ?? currentUserUid,
                                           ),
                                         ),
                                         builder: (context, snapshot) {
@@ -487,13 +487,13 @@ class _HomepagestaffWidgetState extends State<HomepagestaffWidget> {
                                               ),
                                             );
                                           }
-                                          List<AttendanceRecordsRow>
-                                              textAttendanceRecordsRowList =
+                                          List<StaffAttendanceV3Row>
+                                              textAttendanceV3RowList =
                                               snapshot.data!;
 
                                           return Text(
                                             valueOrDefault<String>(
-                                              textAttendanceRecordsRowList
+                                              textAttendanceV3RowList
                                                   .length
                                                   .toString(),
                                               '0',
@@ -581,13 +581,13 @@ class _HomepagestaffWidgetState extends State<HomepagestaffWidget> {
                                     crossAxisAlignment:
                                         CrossAxisAlignment.center,
                                     children: [
-                                      FutureBuilder<List<AttendanceRecordsRow>>(
+                                      FutureBuilder<List<StaffAttendanceV3Row>>(
                                         future:
-                                            AttendanceRecordsTable().queryRows(
+                                            StaffAttendanceV3Table().queryRows(
                                           queryFn: (q) => q
                                               .eqOrNull(
                                                 'staff_id',
-                                                currentUserUid,
+                                                _model.currentStaffId ?? currentUserUid,
                                               )
                                               .eqOrNull(
                                                 'is_late',
@@ -613,13 +613,13 @@ class _HomepagestaffWidgetState extends State<HomepagestaffWidget> {
                                               ),
                                             );
                                           }
-                                          List<AttendanceRecordsRow>
-                                              textAttendanceRecordsRowList =
+                                          List<StaffAttendanceV3Row>
+                                              textAttendanceV3RowList =
                                               snapshot.data!;
 
                                           return Text(
                                             valueOrDefault<String>(
-                                              textAttendanceRecordsRowList
+                                              textAttendanceV3RowList
                                                   .length
                                                   .toString(),
                                               '0',
@@ -841,7 +841,7 @@ class _HomepagestaffWidgetState extends State<HomepagestaffWidget> {
                                           queryFn: (q) => q
                                               .eqOrNull(
                                                 'staff_id',
-                                                currentUserUid,
+                                                _model.currentStaffId ?? currentUserUid,
                                               )
                                               .order('period_end'),
                                         ),
