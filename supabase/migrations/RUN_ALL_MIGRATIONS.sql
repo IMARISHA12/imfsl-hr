@@ -461,6 +461,7 @@ GRANT SELECT ON public.v_repayment_history TO service_role, authenticated;
 -- │   4. 009_rls_policies_and_integration.sql (RLS, notifications, audit) │
 -- │   5. 010_staff_performance_monthly.sql (KPI snapshots, dashboard fn)  │
 -- │   6. 011_rls_real_v2v3_tables.sql   (RLS for v2/v3 tables used by app)│
+-- │   7. 012_missing_hr_tables.sql    (Missing tables, views & aliases)  │
 -- │                                                                        │
 -- │ These are too large for a single SQL Editor run.                       │
 -- └─────────────────────────────────────────────────────────────────────────┘
