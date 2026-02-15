@@ -290,46 +290,55 @@ class _HomepagestaffWidgetState extends State<HomepagestaffWidget> {
                                 ),
                                 FFButtonWidget(
                                   onPressed: () async {
-                                    // Resolve staff_id from user_id before inserting
-                                    String staffId = currentUserUid;
-                                    final staffRows = await StaffTable().queryRows(
-                                      queryFn: (q) => q.eqOrNull('user_id', currentUserUid).limit(1),
-                                    );
-                                    if (staffRows.isNotEmpty) {
-                                      staffId = staffRows.first.id;
-                                    } else {
-                                      final empRows = await EmployeesTable().queryRows(
+                                    if (_model.isClockedIn) return;
+                                    try {
+                                      // Resolve staff_id from user_id before inserting
+                                      String staffId = currentUserUid;
+                                      final staffRows = await StaffTable().queryRows(
                                         queryFn: (q) => q.eqOrNull('user_id', currentUserUid).limit(1),
                                       );
-                                      if (empRows.isNotEmpty) {
-                                        staffId = empRows.first.id;
+                                      if (staffRows.isNotEmpty) {
+                                        staffId = staffRows.first.id;
+                                      } else {
+                                        final empRows = await EmployeesTable().queryRows(
+                                          queryFn: (q) => q.eqOrNull('user_id', currentUserUid).limit(1),
+                                        );
+                                        if (empRows.isNotEmpty) {
+                                          staffId = empRows.first.id;
+                                        }
                                       }
-                                    }
-                                    await StaffAttendanceV3Table().insert({
-                                      'staff_id': staffId,
-                                      'work_date': supaSerialize<DateTime>(
-                                          getCurrentTimestamp),
-                                      'clock_in_time': supaSerialize<DateTime>(
-                                          getCurrentTimestamp),
-                                      'status': 'Present',
-                                    });
-                                    _model.isClockedIn = true;
-                                    safeSetState(() {});
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      SnackBar(
-                                        content: Text(
-                                          'Umeingia kazini!',
-                                          style: TextStyle(
-                                            color: FlutterFlowTheme.of(context)
-                                                .primaryText,
+                                      await StaffAttendanceV3Table().insert({
+                                        'staff_id': staffId,
+                                        'work_date': supaSerialize<DateTime>(
+                                            getCurrentTimestamp),
+                                        'clock_in_time': supaSerialize<DateTime>(
+                                            getCurrentTimestamp),
+                                        'status': 'Present',
+                                      });
+                                      _model.isClockedIn = true;
+                                      safeSetState(() {});
+                                      if (!context.mounted) return;
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(
+                                          content: Text(
+                                            'Umeingia kazini!',
+                                            style: TextStyle(
+                                              color: FlutterFlowTheme.of(context)
+                                                  .primaryText,
+                                            ),
                                           ),
+                                          duration: Duration(milliseconds: 4000),
+                                          backgroundColor:
+                                              FlutterFlowTheme.of(context)
+                                                  .secondary,
                                         ),
-                                        duration: Duration(milliseconds: 4000),
-                                        backgroundColor:
-                                            FlutterFlowTheme.of(context)
-                                                .secondary,
-                                      ),
-                                    );
+                                      );
+                                    } catch (e) {
+                                      if (!context.mounted) return;
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(content: Text('Kosa la kuingia kazini: $e')),
+                                      );
+                                    }
                                   },
                                   text: 'INGIA KAZINI',
                                   options: FFButtonOptions(
