@@ -11,10 +11,10 @@ import 'package:google_fonts/google_fonts.dart';
 import 'hr_performance_model.dart';
 export 'hr_performance_model.dart';
 
-/// Performance Reviews — View pending reviews, submit self-assessment, history.
+/// Performance — Monthly KPI scores and history from staff_performance_monthly.
 ///
-/// TAB 1 (Tathmini): Active reviews requiring self-assessment
-/// TAB 2 (Historia): Past review results with grades
+/// TAB 1 (Tathmini): Latest month's KPI breakdown
+/// TAB 2 (Historia): Monthly performance history with grades
 class HrPerformanceWidget extends StatefulWidget {
   const HrPerformanceWidget({super.key});
 
@@ -30,7 +30,6 @@ class _HrPerformanceWidgetState extends State<HrPerformanceWidget>
   late HrPerformanceModel _model;
   late TabController _tabController;
   final scaffoldKey = GlobalKey<ScaffoldState>();
-  String? _employeeId;
 
   @override
   void initState() {
@@ -39,29 +38,15 @@ class _HrPerformanceWidgetState extends State<HrPerformanceWidget>
     _tabController = TabController(length: 2, vsync: this);
 
     SchedulerBinding.instance.addPostFrameCallback((_) async {
-      await _resolveEmployeeId();
       await _loadData();
     });
   }
 
-  Future<void> _resolveEmployeeId() async {
-    final rows = await EmployeesTable().queryRows(
-      queryFn: (q) => q.eqOrNull('user_id', currentUserUid).limit(1),
-    );
-    if (rows.isNotEmpty) {
-      _employeeId = rows.first.id;
-    }
-  }
-
   Future<void> _loadData() async {
-    if (_employeeId == null) {
-      _model.isLoading = false;
-      safeSetState(() {});
-      return;
-    }
     try {
-      final reviews = await HrService.instance.getMyReviews(_employeeId!);
-      _model.reviews = reviews;
+      final records =
+          await HrService.instance.getMyPerformance(currentUserUid);
+      _model.reviews = records;
       _model.isLoading = false;
     } catch (e) {
       _model.isLoading = false;
@@ -125,7 +110,7 @@ class _HrPerformanceWidgetState extends State<HrPerformanceWidget>
             : TabBarView(
                 controller: _tabController,
                 children: [
-                  _buildPendingTab(context),
+                  _buildLatestTab(context),
                   _buildHistoryTab(context),
                 ],
               ),
@@ -133,15 +118,10 @@ class _HrPerformanceWidgetState extends State<HrPerformanceWidget>
     );
   }
 
-  // ── TAB 1: Pending Reviews ───────────────────────────────────────────
+  // ── TAB 1: Latest Month KPI Breakdown ──────────────────────────────
 
-  Widget _buildPendingTab(BuildContext context) {
-    final pending = _model.reviews
-        .where((r) =>
-            r['status'] == 'pending' || r['status'] == 'self_review')
-        .toList();
-
-    if (pending.isEmpty) {
+  Widget _buildLatestTab(BuildContext context) {
+    if (_model.reviews.isEmpty) {
       return RefreshIndicator(
         onRefresh: _loadData,
         child: ListView(
@@ -153,11 +133,11 @@ class _HrPerformanceWidgetState extends State<HrPerformanceWidget>
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const Icon(Icons.check_circle_outline,
-                        size: 64.0, color: Color(0xFF059669)),
+                    const Icon(Icons.bar_chart,
+                        size: 64.0, color: Color(0xFF9CA3AF)),
                     const SizedBox(height: 12.0),
                     Text(
-                      'Hakuna tathmini zinazosubiri',
+                      'Hakuna data ya utendaji',
                       style: FlutterFlowTheme.of(context).bodyLarge,
                     ),
                   ],
@@ -169,257 +149,210 @@ class _HrPerformanceWidgetState extends State<HrPerformanceWidget>
       );
     }
 
+    final latest = _model.reviews.first;
+    final grade = latest['grade'] as String? ?? '-';
+    final overallScore = latest['overall_score'] as num? ?? 0;
+    final monthNames = [
+      '', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+    ];
+    final month = (latest['month'] as int?) ?? 0;
+    final year = (latest['year'] as int?) ?? 0;
+    final periodLabel =
+        '${month > 0 && month <= 12 ? monthNames[month] : month} $year';
+
+    final gradeColors = {
+      'A': const Color(0xFF059669),
+      'B': const Color(0xFF3B82F6),
+      'C': const Color(0xFFF59E0B),
+      'D': const Color(0xFFEF4444),
+      'F': const Color(0xFF991B1B),
+    };
+    final gradeColor = gradeColors[grade] ?? const Color(0xFF6B7280);
+
     return RefreshIndicator(
       onRefresh: _loadData,
-      child: ListView.builder(
+      child: SingleChildScrollView(
         physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.all(16.0),
-        itemCount: pending.length,
-      itemBuilder: (context, index) {
-        final review = pending[index];
-        final cycle =
-            review['performance_review_cycles'] as Map<String, dynamic>? ?? {};
-        final cycleName = cycle['cycle_name'] ?? 'Review';
-        final status = review['status'] ?? 'pending';
-
-        return Container(
-          margin: const EdgeInsets.only(bottom: 12.0),
-          padding: const EdgeInsets.all(16.0),
-          decoration: BoxDecoration(
-            color: FlutterFlowTheme.of(context).secondaryBackground,
-            borderRadius: BorderRadius.circular(12.0),
-            border: Border.all(color: const Color(0x1A3B82F6)),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        padding: const EdgeInsets.all(20.0),
+        child: Column(
+          children: [
+            // Grade header card
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(24.0),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [gradeColor, gradeColor.withOpacity(0.7)],
+                ),
+                borderRadius: BorderRadius.circular(16.0),
+              ),
+              child: Column(
                 children: [
-                  Expanded(
-                    child: Text(
-                      cycleName,
-                      style:
-                          FlutterFlowTheme.of(context).bodyLarge.override(
-                                font: GoogleFonts.inter(
-                                    fontWeight: FontWeight.w600),
-                                letterSpacing: 0.0,
-                              ),
+                  Text(
+                    periodLabel,
+                    style: FlutterFlowTheme.of(context).bodyMedium.override(
+                          font: GoogleFonts.inter(),
+                          color: const Color(0xCCFFFFFF),
+                          letterSpacing: 0.0,
+                        ),
+                  ),
+                  const SizedBox(height: 8.0),
+                  Text(
+                    grade,
+                    style: GoogleFonts.interTight(
+                      color: Colors.white,
+                      fontSize: 56.0,
+                      fontWeight: FontWeight.bold,
                     ),
                   ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 8.0, vertical: 2.0),
-                    decoration: BoxDecoration(
-                      color: const Color(0x1AF59E0B),
-                      borderRadius: BorderRadius.circular(4.0),
-                    ),
-                    child: Text(
-                      status == 'pending'
-                          ? 'Inasubiri'
-                          : 'Tathmini Binafsi',
-                      style: const TextStyle(
-                          color: Color(0xFFF59E0B),
-                          fontSize: 11.0,
-                          fontWeight: FontWeight.w600),
+                  const SizedBox(height: 4.0),
+                  Text(
+                    'Alama: ${overallScore.toStringAsFixed(1)}',
+                    style: GoogleFonts.inter(
+                      color: const Color(0xCCFFFFFF),
+                      fontSize: 16.0,
                     ),
                   ),
                 ],
               ),
-              if (cycle['period_start'] != null)
-                Padding(
-                  padding: const EdgeInsets.only(top: 4.0),
-                  child: Text(
-                    '${_formatDate(cycle['period_start'])} - ${_formatDate(cycle['period_end'])}',
-                    style: FlutterFlowTheme.of(context).bodySmall.override(
-                          font: GoogleFonts.inter(),
-                          color:
-                              FlutterFlowTheme.of(context).secondaryText,
+            ),
+            const SizedBox(height: 20.0),
+            // KPI breakdown
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(16.0),
+              decoration: BoxDecoration(
+                color: FlutterFlowTheme.of(context).secondaryBackground,
+                borderRadius: BorderRadius.circular(12.0),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Vipimo vya Utendaji',
+                    style: FlutterFlowTheme.of(context).titleSmall.override(
+                          font: GoogleFonts.interTight(
+                              fontWeight: FontWeight.w600),
                           letterSpacing: 0.0,
                         ),
                   ),
-                ),
-              const SizedBox(height: 12.0),
-              SizedBox(
-                width: double.infinity,
-                child: FFButtonWidget(
-                  onPressed: () => _showSelfReviewForm(context, review),
-                  text: 'Jaza Tathmini Binafsi',
-                  options: FFButtonOptions(
-                    height: 40.0,
-                    color: const Color(0xFF1E3A8A),
-                    textStyle: GoogleFonts.inter(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w600,
-                        fontSize: 13.0),
-                    borderRadius: BorderRadius.circular(8.0),
+                  const SizedBox(height: 14.0),
+                  _kpiBar('Mahudhurio',
+                      latest['attendance_score'] as num? ?? 0, 100),
+                  _kpiBar('Ukusanyaji',
+                      latest['collection_score'] as num? ?? 0, 100),
+                  _kpiBar('Huduma kwa Wateja',
+                      latest['customer_satisfaction_score'] as num? ?? 0, 100),
+                  _kpiBar('Kufuata Sheria',
+                      latest['compliance_score'] as num? ?? 0, 100),
+                ],
+              ),
+            ),
+            const SizedBox(height: 14.0),
+            // Attendance details
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(16.0),
+              decoration: BoxDecoration(
+                color: FlutterFlowTheme.of(context).secondaryBackground,
+                borderRadius: BorderRadius.circular(12.0),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Maelezo ya Mahudhurio',
+                    style: FlutterFlowTheme.of(context).titleSmall.override(
+                          font: GoogleFonts.interTight(
+                              fontWeight: FontWeight.w600),
+                          letterSpacing: 0.0,
+                        ),
                   ),
+                  const SizedBox(height: 12.0),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceAround,
+                    children: [
+                      _statBadge('Siku Kazini',
+                          '${latest['days_worked'] ?? 0}',
+                          const Color(0xFF059669)),
+                      _statBadge('Kuchelewa',
+                          '${latest['days_late'] ?? 0}',
+                          const Color(0xFFF59E0B)),
+                      _statBadge('Kutokuwepo',
+                          '${latest['days_absent'] ?? 0}',
+                          const Color(0xFFEF4444)),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            if (latest['recommendation'] != null) ...[
+              const SizedBox(height: 14.0),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(16.0),
+                decoration: BoxDecoration(
+                  color: FlutterFlowTheme.of(context).secondaryBackground,
+                  borderRadius: BorderRadius.circular(12.0),
+                  border: Border.all(color: const Color(0x1A3B82F6)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Mapendekezo',
+                      style: FlutterFlowTheme.of(context).titleSmall.override(
+                            font: GoogleFonts.interTight(
+                                fontWeight: FontWeight.w600),
+                            letterSpacing: 0.0,
+                          ),
+                    ),
+                    const SizedBox(height: 8.0),
+                    Text(
+                      latest['recommendation'] as String? ?? '',
+                      style: FlutterFlowTheme.of(context).bodyMedium.override(
+                            font: GoogleFonts.inter(),
+                            letterSpacing: 0.0,
+                          ),
+                    ),
+                    if (latest['recommendation_reason'] != null)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 6.0),
+                        child: Text(
+                          latest['recommendation_reason'] as String,
+                          style:
+                              FlutterFlowTheme.of(context).bodySmall.override(
+                                    font: GoogleFonts.inter(
+                                        fontStyle: FontStyle.italic),
+                                    color: FlutterFlowTheme.of(context)
+                                        .secondaryText,
+                                    letterSpacing: 0.0,
+                                  ),
+                        ),
+                      ),
+                  ],
                 ),
               ),
             ],
-          ),
-        );
-      },
-      ),
-    );
-  }
-
-  void _showSelfReviewForm(
-      BuildContext context, Map<String, dynamic> review) {
-    // Reset scores
-    _model.quality = 3;
-    _model.productivity = 3;
-    _model.teamwork = 3;
-    _model.initiative = 3;
-    _model.attendance = 3;
-    _model.commentsController?.clear();
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: FlutterFlowTheme.of(context).secondaryBackground,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20.0)),
-      ),
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setSheetState) => DraggableScrollableSheet(
-          initialChildSize: 0.85,
-          minChildSize: 0.5,
-          maxChildSize: 0.95,
-          expand: false,
-          builder: (ctx, scrollCtrl) => SingleChildScrollView(
-            controller: scrollCtrl,
-            padding: const EdgeInsets.all(20.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Center(
-                  child: Container(
-                    width: 40, height: 4,
-                    decoration: BoxDecoration(
-                      color: Colors.grey[300],
-                      borderRadius: BorderRadius.circular(2),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 16.0),
-                Text(
-                  'Tathmini Binafsi',
-                  style:
-                      FlutterFlowTheme.of(context).titleLarge.override(
-                            font: GoogleFonts.interTight(
-                                fontWeight: FontWeight.bold),
-                            letterSpacing: 0.0,
-                          ),
-                ),
-                const SizedBox(height: 8.0),
-                Text(
-                  'Jikadirie 1-5 kwa kila eneo',
-                  style: FlutterFlowTheme.of(context).bodySmall.override(
-                        font: GoogleFonts.inter(),
-                        color:
-                            FlutterFlowTheme.of(context).secondaryText,
-                        letterSpacing: 0.0,
-                      ),
-                ),
-                const SizedBox(height: 20.0),
-                _scoreSlider('Ubora wa Kazi', _model.quality,
-                    (v) => setSheetState(() => _model.quality = v)),
-                _scoreSlider('Tija', _model.productivity,
-                    (v) => setSheetState(() => _model.productivity = v)),
-                _scoreSlider('Ushirikiano', _model.teamwork,
-                    (v) => setSheetState(() => _model.teamwork = v)),
-                _scoreSlider('Ubunifu', _model.initiative,
-                    (v) => setSheetState(() => _model.initiative = v)),
-                _scoreSlider('Mahudhurio', _model.attendance,
-                    (v) => setSheetState(() => _model.attendance = v)),
-                const SizedBox(height: 12.0),
-                TextFormField(
-                  controller: _model.commentsController,
-                  decoration: InputDecoration(
-                    labelText: 'Maoni (si lazima)',
-                    border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10.0)),
-                  ),
-                  maxLines: 3,
-                ),
-                const SizedBox(height: 20.0),
-                SizedBox(
-                  width: double.infinity,
-                  child: FFButtonWidget(
-                    onPressed: _model.isSubmitting
-                        ? null
-                        : () async {
-                            _model.isSubmitting = true;
-                            safeSetState(() {});
-                            try {
-                              await HrService.instance.submitSelfReview(
-                                reviewId: review['id'],
-                                quality: _model.quality.round(),
-                                productivity: _model.productivity.round(),
-                                teamwork: _model.teamwork.round(),
-                                initiative: _model.initiative.round(),
-                                attendance: _model.attendance.round(),
-                                comments: _model.commentsController?.text,
-                              );
-                              if (ctx.mounted) Navigator.pop(ctx);
-                              if (!mounted) return;
-                              await _loadData();
-                              if (context.mounted) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content:
-                                        Text('Tathmini binafsi imetumwa!'),
-                                    backgroundColor: Color(0xFF059669),
-                                  ),
-                                );
-                              }
-                            } catch (e) {
-                              if (context.mounted) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(content: Text('Kosa: $e')),
-                                );
-                              }
-                            } finally {
-                              _model.isSubmitting = false;
-                              safeSetState(() {});
-                            }
-                          },
-                    text: _model.isSubmitting
-                        ? 'Inatuma...'
-                        : 'Tuma Tathmini',
-                    options: FFButtonOptions(
-                      height: 50.0,
-                      color: const Color(0xFF1E3A8A),
-                      textStyle: GoogleFonts.inter(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w600),
-                      borderRadius: BorderRadius.circular(10.0),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
+          ],
         ),
       ),
     );
   }
 
-  Widget _scoreSlider(
-      String label, double value, ValueChanged<double> onChanged) {
-    final colors = [
-      const Color(0xFFEF4444),
-      const Color(0xFFF59E0B),
-      const Color(0xFFFBBF24),
-      const Color(0xFF34D399),
-      const Color(0xFF059669),
-    ];
-    final labels = ['Dhaifu', 'Wastani-', 'Wastani', 'Nzuri', 'Bora'];
-    final idx = (value.round() - 1).clamp(0, 4);
+  Widget _kpiBar(String label, num score, num maxScore) {
+    final progress = maxScore > 0 ? (score / maxScore).clamp(0.0, 1.0) : 0.0;
+    final color = progress >= 0.8
+        ? const Color(0xFF059669)
+        : progress >= 0.6
+            ? const Color(0xFF3B82F6)
+            : progress >= 0.4
+                ? const Color(0xFFF59E0B)
+                : const Color(0xFFEF4444);
 
     return Padding(
-      padding: const EdgeInsets.only(bottom: 16.0),
+      padding: const EdgeInsets.only(bottom: 14.0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -428,34 +361,61 @@ class _HrPerformanceWidgetState extends State<HrPerformanceWidget>
             children: [
               Text(label,
                   style: GoogleFonts.inter(
-                      fontWeight: FontWeight.w500, fontSize: 14.0)),
-              Text('${value.round()}/5 — ${labels[idx]}',
+                      fontSize: 13.0, fontWeight: FontWeight.w500)),
+              Text('${score.toStringAsFixed(1)}',
                   style: GoogleFonts.inter(
                       fontSize: 13.0,
                       fontWeight: FontWeight.w600,
-                      color: colors[idx])),
+                      color: color)),
             ],
           ),
-          Slider(
-            value: value,
-            min: 1,
-            max: 5,
-            divisions: 4,
-            activeColor: colors[idx],
-            onChanged: onChanged,
+          const SizedBox(height: 6.0),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(4.0),
+            child: LinearProgressIndicator(
+              value: progress.toDouble(),
+              backgroundColor: const Color(0xFFE5E7EB),
+              valueColor: AlwaysStoppedAnimation<Color>(color),
+              minHeight: 8.0,
+            ),
           ),
         ],
       ),
     );
   }
 
+  Widget _statBadge(String label, String value, Color color) {
+    return Column(
+      children: [
+        Container(
+          width: 48.0,
+          height: 48.0,
+          decoration: BoxDecoration(
+            color: color.withOpacity(0.1),
+            shape: BoxShape.circle,
+          ),
+          child: Center(
+            child: Text(
+              value,
+              style: GoogleFonts.interTight(
+                  fontSize: 18.0,
+                  fontWeight: FontWeight.bold,
+                  color: color),
+            ),
+          ),
+        ),
+        const SizedBox(height: 4.0),
+        Text(label,
+            style: GoogleFonts.inter(
+                fontSize: 11.0, color: const Color(0xFF9CA3AF))),
+      ],
+    );
+  }
+
   // ── TAB 2: History ───────────────────────────────────────────────────
 
   Widget _buildHistoryTab(BuildContext context) {
-    final completed =
-        _model.reviews.where((r) => r['status'] == 'completed').toList();
-
-    if (completed.isEmpty) {
+    if (_model.reviews.isEmpty) {
       return RefreshIndicator(
         onRefresh: _loadData,
         child: ListView(
@@ -465,7 +425,7 @@ class _HrPerformanceWidgetState extends State<HrPerformanceWidget>
               height: MediaQuery.of(context).size.height * 0.5,
               child: Center(
                 child: Text(
-                  'Hakuna tathmini zilizokamilika',
+                  'Hakuna rekodi za utendaji',
                   style: FlutterFlowTheme.of(context).bodyMedium,
                 ),
               ),
@@ -475,74 +435,81 @@ class _HrPerformanceWidgetState extends State<HrPerformanceWidget>
       );
     }
 
+    final monthNames = [
+      '', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+    ];
+
     return RefreshIndicator(
       onRefresh: _loadData,
       child: ListView.builder(
         physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.all(16.0),
-        itemCount: completed.length,
-      itemBuilder: (context, index) {
-        final review = completed[index];
-        final cycle =
-            review['performance_review_cycles'] as Map<String, dynamic>? ?? {};
-        final grade = review['overall_grade'] ?? '-';
-        final score = review['overall_score'];
+        itemCount: _model.reviews.length,
+        itemBuilder: (context, index) {
+          final record = _model.reviews[index];
+          final grade = record['grade'] as String? ?? '-';
+          final score = record['overall_score'] as num?;
+          final month = (record['month'] as int?) ?? 0;
+          final year = (record['year'] as int?) ?? 0;
+          final periodLabel =
+              '${month > 0 && month <= 12 ? monthNames[month] : month} $year';
 
-        final gradeColors = {
-          'A': const Color(0xFF059669),
-          'B': const Color(0xFF3B82F6),
-          'C': const Color(0xFFF59E0B),
-          'D': const Color(0xFFEF4444),
-          'F': const Color(0xFF991B1B),
-        };
+          final gradeColors = {
+            'A': const Color(0xFF059669),
+            'B': const Color(0xFF3B82F6),
+            'C': const Color(0xFFF59E0B),
+            'D': const Color(0xFFEF4444),
+            'F': const Color(0xFF991B1B),
+          };
 
-        return Container(
-          margin: const EdgeInsets.only(bottom: 12.0),
-          padding: const EdgeInsets.all(16.0),
-          decoration: BoxDecoration(
-            color: FlutterFlowTheme.of(context).secondaryBackground,
-            borderRadius: BorderRadius.circular(12.0),
-          ),
-          child: Row(
-            children: [
-              Container(
-                width: 48.0,
-                height: 48.0,
-                decoration: BoxDecoration(
-                  color: (gradeColors[grade] ?? const Color(0xFF6B7280))
-                      .withOpacity(0.12),
-                  shape: BoxShape.circle,
-                ),
-                child: Center(
-                  child: Text(
-                    grade,
-                    style: GoogleFonts.interTight(
-                      fontSize: 22.0,
-                      fontWeight: FontWeight.bold,
-                      color:
-                          gradeColors[grade] ?? const Color(0xFF6B7280),
+          return Container(
+            margin: const EdgeInsets.only(bottom: 12.0),
+            padding: const EdgeInsets.all(16.0),
+            decoration: BoxDecoration(
+              color: FlutterFlowTheme.of(context).secondaryBackground,
+              borderRadius: BorderRadius.circular(12.0),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 48.0,
+                  height: 48.0,
+                  decoration: BoxDecoration(
+                    color:
+                        (gradeColors[grade] ?? const Color(0xFF6B7280))
+                            .withOpacity(0.12),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Center(
+                    child: Text(
+                      grade,
+                      style: GoogleFonts.interTight(
+                        fontSize: 22.0,
+                        fontWeight: FontWeight.bold,
+                        color: gradeColors[grade] ??
+                            const Color(0xFF6B7280),
+                      ),
                     ),
                   ),
                 ),
-              ),
-              const SizedBox(width: 14.0),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      cycle['cycle_name'] ?? 'Review',
-                      style: FlutterFlowTheme.of(context)
-                          .bodyLarge
-                          .override(
-                            font: GoogleFonts.inter(
-                                fontWeight: FontWeight.w600),
-                            letterSpacing: 0.0,
-                          ),
-                    ),
-                    if (cycle['period_start'] != null)
+                const SizedBox(width: 14.0),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
                       Text(
-                        '${_formatDate(cycle['period_start'])} - ${_formatDate(cycle['period_end'])}',
+                        periodLabel,
+                        style: FlutterFlowTheme.of(context)
+                            .bodyLarge
+                            .override(
+                              font: GoogleFonts.inter(
+                                  fontWeight: FontWeight.w600),
+                              letterSpacing: 0.0,
+                            ),
+                      ),
+                      Text(
+                        'Siku ${record['days_worked'] ?? 0} kazini, ${record['days_late'] ?? 0} kuchelewa',
                         style: FlutterFlowTheme.of(context)
                             .bodySmall
                             .override(
@@ -552,30 +519,23 @@ class _HrPerformanceWidgetState extends State<HrPerformanceWidget>
                               letterSpacing: 0.0,
                             ),
                       ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
-              if (score != null)
-                Text(
-                  '${(score as num).toStringAsFixed(1)}%',
-                  style: GoogleFonts.interTight(
-                      fontSize: 18.0,
-                      fontWeight: FontWeight.bold,
-                      color:
-                          gradeColors[grade] ?? const Color(0xFF6B7280)),
-                ),
-            ],
-          ),
-        );
-      },
+                if (score != null)
+                  Text(
+                    '${score.toStringAsFixed(1)}',
+                    style: GoogleFonts.interTight(
+                        fontSize: 18.0,
+                        fontWeight: FontWeight.bold,
+                        color: gradeColors[grade] ??
+                            const Color(0xFF6B7280)),
+                  ),
+              ],
+            ),
+          );
+        },
       ),
     );
-  }
-
-  String _formatDate(dynamic raw) {
-    if (raw == null) return '-';
-    final dt = DateTime.tryParse(raw.toString());
-    if (dt == null) return raw.toString();
-    return dateTimeFormat('yMMMd', dt);
   }
 }

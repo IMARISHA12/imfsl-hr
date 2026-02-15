@@ -4,9 +4,13 @@ import 'supabase.dart';
 
 /// Central service for all HR operations.
 ///
-/// Wraps Supabase edge function calls and direct table/RPC queries
-/// used by the Flutter app for payroll, leave, attendance, performance,
-/// and notifications.
+/// Uses REAL Supabase tables (from FlutterFlow schema):
+///   Attendance:  staff_attendance_v3, attendance_v2_today, attendance_settings
+///   Leave:       leave_requests_v2, leave_requests_v2_enriched, leave_types, leave_balances
+///   Payroll:     payroll_runs, salary_structures, payslips
+///   Performance: staff_performance_monthly, staff_performance
+///   Loans:       staff_loans, staff_salary_loans
+///   Notifications: notifications
 class HrService {
   HrService._();
   static final instance = HrService._();
@@ -28,28 +32,11 @@ class HrService {
     return List<Map<String, dynamic>>.from(res);
   }
 
-  /// Get payslips for a given payroll run.
-  Future<List<Map<String, dynamic>>> getPayslips(String payrollRunId) async {
-    final res = await _client
-        .from('payslips')
-        .select()
-        .eq('payroll_run_id', payrollRunId)
-        .order('department')
-        .order('employee_name');
-    return List<Map<String, dynamic>>.from(res);
-  }
+  // ──────────────────────────────────────────────
+  //  SALARY & PAYSLIPS (uses salary_structures, payslips)
+  // ──────────────────────────────────────────────
 
-  /// Get current user's payslips.
-  Future<List<Map<String, dynamic>>> getMyPayslips(String employeeId) async {
-    final res = await _client
-        .from('payslips')
-        .select('*, payroll_runs!inner(month, status)')
-        .eq('employee_id', employeeId)
-        .order('created_at', ascending: false);
-    return List<Map<String, dynamic>>.from(res);
-  }
-
-  /// Get current user's salary structure.
+  /// Get current salary structure for an employee.
   Future<Map<String, dynamic>?> getMySalary(String employeeId) async {
     final res = await _client
         .from('salary_structures')
@@ -60,248 +47,335 @@ class HrService {
     return res;
   }
 
+  /// Get payslips for an employee with payroll run info.
+  Future<List<Map<String, dynamic>>> getMyPayslips(String employeeId) async {
+    final res = await _client
+        .from('payslips')
+        .select('*, payroll_runs(month, run_period_year, run_period_month, status)')
+        .eq('employee_id', employeeId)
+        .order('created_at', ascending: false)
+        .limit(24);
+    return List<Map<String, dynamic>>.from(res);
+  }
+
   // ──────────────────────────────────────────────
   //  LEAVE MANAGEMENT
   // ──────────────────────────────────────────────
 
-  /// Submit a new leave request via edge function.
+  /// Get leave types (existing table).
+  Future<List<Map<String, dynamic>>> getLeaveTypes() async {
+    final res = await _client
+        .from('leave_types')
+        .select()
+        .order('name');
+    return List<Map<String, dynamic>>.from(res);
+  }
+
+  /// Submit a new leave request directly to leave_requests_v2.
   Future<Map<String, dynamic>> submitLeaveRequest({
-    required String userId,
-    required String leaveTypeId,
+    required String staffId,
+    required String leaveType,
     required String startDate,
     required String endDate,
     String? reason,
   }) async {
-    return _callFunction('hr-leave-workflow', {
-      'operation': 'submit',
-      'user_id': userId,
-      'leave_type_id': leaveTypeId,
-      'start_date': startDate,
-      'end_date': endDate,
-      if (reason != null) 'reason': reason,
-    });
+    final res = await _client
+        .from('leave_requests_v2')
+        .insert({
+          'staff_id': staffId,
+          'leave_type': leaveType,
+          'start_date': startDate,
+          'end_date': endDate,
+          if (reason != null) 'reason': reason,
+          'status': 'pending',
+        })
+        .select()
+        .single();
+    return Map<String, dynamic>.from(res);
   }
 
-  /// Get leave balance for a user.
-  Future<Map<String, dynamic>> getLeaveBalance(
+  /// Get leave balance for a user from leave_balances table.
+  Future<List<Map<String, dynamic>>> getLeaveBalance(
     String userId, {
     int? year,
   }) async {
-    return _callFunction('hr-leave-workflow', {
-      'operation': 'balance',
-      'user_id': userId,
-      if (year != null) 'year': year,
-    });
+    var query = _client
+        .from('leave_balances')
+        .select('*, leave_types!inner(name, code, days_allowed)')
+        .eq('user_id', userId);
+    if (year != null) {
+      query = query.eq('year', year);
+    }
+    final res = await query;
+    return List<Map<String, dynamic>>.from(res);
   }
 
   /// Get all pending leave requests (for managers).
-  /// Uses v_leave_dashboard which includes employee name and balance info.
+  /// Uses leave_requests_v2_enriched VIEW which includes staff name.
   Future<List<Map<String, dynamic>>> getPendingLeaveRequests() async {
     final res = await _client
-        .from('v_leave_dashboard')
+        .from('leave_requests_v2_enriched')
         .select()
         .eq('status', 'pending')
-        .order('requested_at', ascending: false)
+        .order('start_date', ascending: false)
         .limit(100);
     return List<Map<String, dynamic>>.from(res);
   }
 
-  /// Get my leave requests.
-  Future<List<Map<String, dynamic>>> getMyLeaveRequests(String userId) async {
+  /// Get my leave requests from leave_requests_v2.
+  Future<List<Map<String, dynamic>>> getMyLeaveRequests(String staffId) async {
     final res = await _client
-        .from('leave_requests')
-        .select('*, leave_types!inner(leave_type)')
-        .eq('user_id', userId)
-        .order('created_at', ascending: false);
+        .from('leave_requests_v2')
+        .select()
+        .eq('staff_id', staffId)
+        .order('start_date', ascending: false)
+        .limit(50);
     return List<Map<String, dynamic>>.from(res);
   }
 
+  /// Approve/reject a leave request.
+  Future<void> processLeaveRequest({
+    required String requestId,
+    required String action,
+    required String approvedBy,
+  }) async {
+    await _client
+        .from('leave_requests_v2')
+        .update({
+          'status': action, // 'approved' or 'rejected'
+          'approved_by': approvedBy,
+        })
+        .eq('id', requestId);
+  }
+
   /// Cancel a leave request.
-  Future<Map<String, dynamic>> cancelLeaveRequest(
-    String requestId,
-    String userId,
-  ) async {
-    return _callFunction('hr-leave-workflow', {
-      'operation': 'cancel',
-      'request_id': requestId,
-      'user_id': userId,
-    });
+  Future<void> cancelLeaveRequest(String requestId) async {
+    await _client
+        .from('leave_requests_v2')
+        .update({'status': 'cancelled'})
+        .eq('id', requestId);
   }
 
   // ──────────────────────────────────────────────
-  //  ATTENDANCE
+  //  ATTENDANCE (uses staff_attendance_v3)
   // ──────────────────────────────────────────────
 
-  /// Clock in with optional GPS coordinates.
+  /// Clock in — insert row into staff_attendance_v3.
   Future<Map<String, dynamic>> clockIn(
     String staffId, {
     double? latitude,
     double? longitude,
+    String? geofenceId,
+    String? deviceId,
+    String? photoPath,
   }) async {
-    return _callFunction('hr-attendance', {
-      'operation': 'clock_in',
-      'staff_id': staffId,
-      if (latitude != null) 'latitude': latitude,
-      if (longitude != null) 'longitude': longitude,
-    });
+    final now = DateTime.now();
+    final today = '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+
+    final res = await _client
+        .from('staff_attendance_v3')
+        .upsert({
+          'staff_id': staffId,
+          'work_date': today,
+          'clock_in_time': now.toIso8601String(),
+          if (latitude != null) 'clock_in_latitude': latitude,
+          if (longitude != null) 'clock_in_longitude': longitude,
+          if (geofenceId != null) 'clock_in_geofence_id': geofenceId,
+          if (deviceId != null) 'clock_in_device_id': deviceId,
+          if (photoPath != null) 'clock_in_photo_path': photoPath,
+          'status': 'present',
+        }, onConflict: 'staff_id,work_date')
+        .select()
+        .single();
+    return Map<String, dynamic>.from(res);
   }
 
-  /// Clock out with optional daily report.
+  /// Clock out — update existing row in staff_attendance_v3.
   Future<Map<String, dynamic>> clockOut(
     String staffId, {
-    String? dailyReport,
+    double? latitude,
+    double? longitude,
+    String? notes,
   }) async {
-    return _callFunction('hr-attendance', {
-      'operation': 'clock_out',
-      'staff_id': staffId,
-      if (dailyReport != null) 'daily_report': dailyReport,
-    });
+    final now = DateTime.now();
+    final today = '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+
+    final res = await _client
+        .from('staff_attendance_v3')
+        .update({
+          'clock_out_time': now.toIso8601String(),
+          if (latitude != null) 'clock_out_latitude': latitude,
+          if (longitude != null) 'clock_out_longitude': longitude,
+          if (notes != null) 'notes': notes,
+        })
+        .eq('staff_id', staffId)
+        .eq('work_date', today)
+        .select()
+        .single();
+    return Map<String, dynamic>.from(res);
   }
 
-  /// Get my attendance records for a month.
-  Future<Map<String, dynamic>> getMyAttendance(
+  /// Get my attendance records for a month from staff_attendance_v3.
+  Future<List<Map<String, dynamic>>> getMyAttendance(
     String staffId, {
     int? month,
     int? year,
   }) async {
-    return _callFunction('hr-attendance', {
-      'operation': 'my_records',
-      'staff_id': staffId,
-      if (month != null) 'month': month,
-      if (year != null) 'year': year,
-    });
+    final now = DateTime.now();
+    final m = month ?? now.month;
+    final y = year ?? now.year;
+    final startDate = '$y-${m.toString().padLeft(2, '0')}-01';
+    final endDate = m == 12
+        ? '${y + 1}-01-01'
+        : '$y-${(m + 1).toString().padLeft(2, '0')}-01';
+
+    final res = await _client
+        .from('staff_attendance_v3')
+        .select()
+        .eq('staff_id', staffId)
+        .gte('work_date', startDate)
+        .lt('work_date', endDate)
+        .order('work_date', ascending: false);
+    return List<Map<String, dynamic>>.from(res);
   }
 
   /// Get today's attendance for all staff (manager view).
-  Future<Map<String, dynamic>> getTodayAttendance({
-    String? department,
-  }) async {
-    return _callFunction('hr-attendance', {
-      'operation': 'today',
-      if (department != null) 'department': department,
-    });
-  }
-
-  // ──────────────────────────────────────────────
-  //  PERFORMANCE REVIEWS
-  // ──────────────────────────────────────────────
-
-  /// Get active review cycles.
-  Future<List<Map<String, dynamic>>> getReviewCycles() async {
+  /// Uses existing attendance_v2_today VIEW.
+  Future<List<Map<String, dynamic>>> getTodayAttendance() async {
     final res = await _client
-        .from('performance_review_cycles')
+        .from('attendance_v2_today')
         .select()
-        .order('period_start', ascending: false)
-        .limit(20);
+        .order('full_name');
     return List<Map<String, dynamic>>.from(res);
   }
 
-  /// Get my pending reviews.
-  Future<List<Map<String, dynamic>>> getMyReviews(String employeeId) async {
+  /// Get attendance settings.
+  Future<Map<String, dynamic>?> getAttendanceSettings() async {
     final res = await _client
-        .from('performance_reviews')
-        .select('*, performance_review_cycles!inner(cycle_name, period_start, period_end)')
-        .eq('employee_id', employeeId)
-        .order('created_at', ascending: false);
-    return List<Map<String, dynamic>>.from(res);
-  }
-
-  /// Submit self-review scores.
-  Future<Map<String, dynamic>> submitSelfReview({
-    required String reviewId,
-    required int quality,
-    required int productivity,
-    required int teamwork,
-    required int initiative,
-    required int attendance,
-    String? comments,
-  }) async {
-    return _callFunction('hr-performance-review', {
-      'operation': 'self_review',
-      'review_id': reviewId,
-      'quality': quality,
-      'productivity': productivity,
-      'teamwork': teamwork,
-      'initiative': initiative,
-      'attendance': attendance,
-      if (comments != null) 'comments': comments,
-    });
-  }
-
-  /// Get performance history for an employee.
-  Future<Map<String, dynamic>> getPerformanceHistory(
-      String employeeId) async {
-    return _callFunction('hr-performance-review', {
-      'operation': 'employee_history',
-      'employee_id': employeeId,
-    });
+        .from('attendance_settings')
+        .select()
+        .limit(1)
+        .maybeSingle();
+    return res;
   }
 
   // ──────────────────────────────────────────────
-  //  NOTIFICATIONS
+  //  PERFORMANCE (uses staff_performance_monthly)
+  // ──────────────────────────────────────────────
+
+  /// Get my monthly performance records.
+  Future<List<Map<String, dynamic>>> getMyPerformance(String staffId) async {
+    final res = await _client
+        .from('staff_performance_monthly')
+        .select()
+        .eq('staff_id', staffId)
+        .order('year', ascending: false)
+        .order('month', ascending: false)
+        .limit(12);
+    return List<Map<String, dynamic>>.from(res);
+  }
+
+  /// Get KPI data from staff_performance table.
+  Future<Map<String, dynamic>?> getLatestKpis(String staffId) async {
+    final res = await _client
+        .from('staff_performance')
+        .select()
+        .eq('staff_id', staffId)
+        .order('calculated_at', ascending: false)
+        .limit(1)
+        .maybeSingle();
+    return res;
+  }
+
+  // ──────────────────────────────────────────────
+  //  NOTIFICATIONS (uses existing notifications table)
   // ──────────────────────────────────────────────
 
   /// Get unread notification count.
-  Future<int> getUnreadNotificationCount() async {
+  Future<int> getUnreadNotificationCount(String userId) async {
     try {
-      final res = await _client.rpc('rpc_unread_notification_count');
-      if (res is int) return res;
-      if (res is Map) return (res['count'] as int?) ?? 0;
-      return 0;
+      final res = await _client
+          .from('notifications')
+          .select()
+          .eq('user_id', userId)
+          .eq('is_read', false);
+      return (res as List).length;
     } catch (_) {
       return 0;
     }
   }
 
-  /// Get notifications with pagination.
-  Future<Map<String, dynamic>> getNotifications({
+  /// Get notifications for a user.
+  Future<List<Map<String, dynamic>>> getNotifications(
+    String userId, {
     int limit = 20,
-    int offset = 0,
     bool unreadOnly = false,
   }) async {
-    final res = await _client.rpc('rpc_get_notifications', params: {
-      'p_limit': limit,
-      'p_offset': offset,
-      'p_unread_only': unreadOnly,
-    });
-    if (res is Map) {
-      return Map<String, dynamic>.from(res);
+    var query = _client
+        .from('notifications')
+        .select()
+        .eq('user_id', userId);
+    if (unreadOnly) {
+      query = query.eq('is_read', false);
     }
-    return {'notifications': [], 'total': 0};
+    final res = await query
+        .order('created_at', ascending: false)
+        .limit(limit);
+    return List<Map<String, dynamic>>.from(res);
   }
 
   /// Mark notifications as read.
   Future<void> markNotificationsRead(List<String> notificationIds) async {
-    await _client.rpc('rpc_mark_notifications_read', params: {
-      'p_notification_ids': notificationIds,
-    });
+    await _client
+        .from('notifications')
+        .update({
+          'is_read': true,
+          'read_at': DateTime.now().toIso8601String(),
+        })
+        .inFilter('id', notificationIds);
   }
 
   // ──────────────────────────────────────────────
-  //  DASHBOARD / KPIs
+  //  STAFF LOANS (uses existing staff_loans table)
   // ──────────────────────────────────────────────
 
-  /// Get HR dashboard KPIs (headcount, payroll, leave, attendance, performance).
-  Future<Map<String, dynamic>> getDashboardKpis() async {
-    final res = await _client.rpc('rpc_hr_dashboard_kpis');
-    if (res is Map) {
-      return Map<String, dynamic>.from(res);
-    }
-    return {};
-  }
-
-  /// Get staff salary loans for an employee.
+  /// Get staff loans for an employee.
   Future<List<Map<String, dynamic>>> getMyLoans(String employeeId) async {
     final res = await _client
-        .from('staff_salary_loans')
+        .from('staff_loans')
         .select()
         .eq('employee_id', employeeId)
-        .order('created_at', ascending: false);
+        .order('created_at', ascending: false)
+        .limit(20);
     return List<Map<String, dynamic>>.from(res);
   }
 
   // ──────────────────────────────────────────────
-  //  INTERNAL — Edge Function Caller
+  //  STAFF INFO
+  // ──────────────────────────────────────────────
+
+  /// Get staff record by user_id.
+  Future<Map<String, dynamic>?> getStaffByUserId(String userId) async {
+    final res = await _client
+        .from('staff')
+        .select()
+        .eq('user_id', userId)
+        .maybeSingle();
+    return res;
+  }
+
+  /// Get active leave (currently on leave) from the enriched view.
+  Future<List<Map<String, dynamic>>> getActiveLeaves() async {
+    final res = await _client
+        .from('leave_requests_v2_enriched')
+        .select()
+        .eq('is_active_now', true)
+        .limit(50);
+    return List<Map<String, dynamic>>.from(res);
+  }
+
+  // ──────────────────────────────────────────────
+  //  INTERNAL — Edge Function Caller (for complex operations)
   // ──────────────────────────────────────────────
 
   Future<Map<String, dynamic>> _callFunction(

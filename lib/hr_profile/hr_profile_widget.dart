@@ -129,7 +129,7 @@ class _HrProfileWidgetState extends State<HrProfileWidget> {
                         _buildSection(context, 'Taarifa Binafsi', [
                           _infoRow('Jina Kamili', _e('full_name')),
                           _infoRow('Barua Pepe', _e('email')),
-                          _infoRow('Simu', _e('phone_number')),
+                          _infoRow('Simu', _e('phone')),
                           _infoRow('Jinsia', _e('gender')),
                           _infoRow('Tarehe ya Kuzaliwa', _e('date_of_birth')),
                           _infoRow('NIDA/Kitambulisho', _e('national_id')),
@@ -140,7 +140,6 @@ class _HrProfileWidgetState extends State<HrProfileWidget> {
                           _infoRow('Idara', _e('dept')),
                           _infoRow('Cheo', _e('position')),
                           _infoRow('Tawi', _e('branch')),
-                          _infoRow('Aina ya Ajira', _e('employment_type')),
                           _infoRow('Hali', _e('employment_status') ?? _e('status')),
                           _infoRow('Tarehe ya Kuajiriwa', _e('hire_date')),
                         ]),
@@ -148,7 +147,6 @@ class _HrProfileWidgetState extends State<HrProfileWidget> {
                         _buildSection(context, 'Mkataba', [
                           _infoRow('Mwanzo', _e('contract_start_date')),
                           _infoRow('Mwisho', _e('contract_end_date')),
-                          _infoRow('Aina', _e('contract_type')),
                         ]),
                         const SizedBox(height: 14.0),
                         _buildSection(context, 'Benki', [

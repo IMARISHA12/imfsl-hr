@@ -1,16 +1,20 @@
 /**
  * HR Leave Workflow — Edge Function
  *
- * Operations:
- *   - submit:      Submit a new leave request (validates & creates)
- *   - approve:     Approve a pending leave request
- *   - reject:      Reject a pending leave request
- *   - cancel:      Cancel a pending/approved leave request
- *   - balance:     Get leave balance for a user
- *   - init_year:   Initialize annual leave balances for all staff
- *   - team_calendar: Get team leave calendar for a date range
+ * Uses REAL Supabase tables:
+ *   - leave_requests_v2 (staff_id, leave_type TEXT, status)
+ *   - leave_requests_v2_enriched (view with staff_name, is_active_now)
+ *   - leave_types (code, name, days_allowed)
+ *   - leave_balances (user_id, leave_type_id UUID, year)
  *
- * Authentication: service role JWT or authorized user
+ * Operations:
+ *   - submit:        Insert into leave_requests_v2
+ *   - approve:       Update status to 'approved'
+ *   - reject:        Update status to 'rejected'
+ *   - cancel:        Update status to 'cancelled'
+ *   - my_requests:   Get leave requests for a staff member
+ *   - pending:       Get pending requests (manager view)
+ *   - team_calendar: Get approved leaves for a date range
  */
 
 import { corsHeaders, jsonResponse } from "../_shared/cors.ts";
@@ -19,22 +23,17 @@ import { requireAuth, requireRole, type AuthUser } from "../_shared/auth.ts";
 
 const FUNCTION_NAME = "hr-leave-workflow";
 
-// Operations that require manager/admin role
-const ADMIN_OPS = new Set(["approve", "reject", "init_year"]);
+const ADMIN_OPS = new Set(["approve", "reject", "pending"]);
 
-interface LeaveRequest {
+interface LeaveBody {
   operation: string;
-  user_id?: string;
+  staff_id?: string;
   request_id?: string;
-  leave_type_id?: string;
+  leave_type?: string;
   start_date?: string;
   end_date?: string;
   reason?: string;
-  attachment_url?: string;
-  manager_comment?: string;
-  processed_by?: string;
-  year?: number;
-  department?: string;
+  approved_by?: string;
 }
 
 Deno.serve(async (req: Request) => {
@@ -45,27 +44,25 @@ Deno.serve(async (req: Request) => {
   const startTime = Date.now();
 
   try {
-    // Authenticate the caller
     const authResult = await requireAuth(req);
     if (authResult instanceof Response) return authResult;
     const user: AuthUser = authResult;
 
-    const body: LeaveRequest = await req.json();
+    const body: LeaveBody = await req.json();
     const { operation } = body;
 
     if (!operation) {
       return jsonResponse({ error: "Missing 'operation' field" }, 400);
     }
 
-    // Enforce role for admin operations
     if (ADMIN_OPS.has(operation)) {
       const denied = requireRole(user, ["manager", "hr_admin", "admin"]);
       if (denied) return denied;
     }
 
-    // For self-service ops, enforce user_id matches caller
-    if ((operation === "submit" || operation === "balance" || operation === "cancel") && body.user_id) {
-      if (body.user_id !== user.id && !["manager", "hr_admin", "admin"].includes(user.role ?? "")) {
+    // Self-service: enforce staff_id matches caller
+    if ((operation === "submit" || operation === "cancel" || operation === "my_requests") && body.staff_id) {
+      if (body.staff_id !== user.id && !["manager", "hr_admin", "admin"].includes(user.role ?? "")) {
         return jsonResponse({ error: "Forbidden: can only access own leave data" }, 403);
       }
     }
@@ -74,22 +71,50 @@ Deno.serve(async (req: Request) => {
 
     switch (operation) {
       case "submit": {
-        if (!body.user_id || !body.leave_type_id || !body.start_date || !body.end_date) {
-          return jsonResponse({ error: "Missing required fields: user_id, leave_type_id, start_date, end_date" }, 400);
+        if (!body.staff_id || !body.leave_type || !body.start_date || !body.end_date) {
+          return jsonResponse({ error: "Missing required: staff_id, leave_type, start_date, end_date" }, 400);
         }
 
-        const { data, error } = await supabase.rpc("rpc_submit_leave_request", {
-          p_user_id: body.user_id,
-          p_leave_type_id: body.leave_type_id,
-          p_start_date: body.start_date,
-          p_end_date: body.end_date,
-          p_reason: body.reason ?? null,
-          p_attachment_url: body.attachment_url ?? null,
-        });
+        // Validate leave_type exists
+        const { data: leaveType } = await supabase
+          .from("leave_types")
+          .select("code, name, days_allowed")
+          .eq("name", body.leave_type)
+          .maybeSingle();
+
+        if (!leaveType) {
+          // Also try by code
+          const { data: ltByCode } = await supabase
+            .from("leave_types")
+            .select("code, name, days_allowed")
+            .eq("code", body.leave_type)
+            .maybeSingle();
+          if (!ltByCode) {
+            return jsonResponse({ error: `Unknown leave type: ${body.leave_type}` }, 400);
+          }
+        }
+
+        // Insert into leave_requests_v2
+        const { data, error } = await supabase
+          .from("leave_requests_v2")
+          .insert({
+            staff_id: body.staff_id,
+            leave_type: body.leave_type,
+            start_date: body.start_date,
+            end_date: body.end_date,
+            reason: body.reason ?? null,
+            status: "pending",
+          })
+          .select()
+          .single();
 
         if (error) throw error;
 
-        return jsonResponse({ ...data, duration_ms: Date.now() - startTime });
+        return jsonResponse({
+          success: true,
+          request: data,
+          duration_ms: Date.now() - startTime,
+        });
       }
 
       case "approve": {
@@ -97,16 +122,24 @@ Deno.serve(async (req: Request) => {
           return jsonResponse({ error: "Missing request_id" }, 400);
         }
 
-        const { data, error } = await supabase.rpc("rpc_process_leave_request", {
-          p_request_id: body.request_id,
-          p_action: "approve",
-          p_manager_comment: body.manager_comment ?? null,
-          p_processed_by: body.processed_by ?? null,
-        });
+        const { data, error } = await supabase
+          .from("leave_requests_v2")
+          .update({
+            status: "approved",
+            approved_by: user.email ?? user.id,
+          })
+          .eq("id", body.request_id)
+          .eq("status", "pending")
+          .select()
+          .single();
 
         if (error) throw error;
 
-        return jsonResponse({ ...data, duration_ms: Date.now() - startTime });
+        return jsonResponse({
+          success: true,
+          request: data,
+          duration_ms: Date.now() - startTime,
+        });
       }
 
       case "reject": {
@@ -114,20 +147,24 @@ Deno.serve(async (req: Request) => {
           return jsonResponse({ error: "Missing request_id" }, 400);
         }
 
-        if (!body.manager_comment) {
-          return jsonResponse({ error: "Rejection requires a manager_comment" }, 400);
-        }
-
-        const { data, error } = await supabase.rpc("rpc_process_leave_request", {
-          p_request_id: body.request_id,
-          p_action: "reject",
-          p_manager_comment: body.manager_comment,
-          p_processed_by: body.processed_by ?? null,
-        });
+        const { data, error } = await supabase
+          .from("leave_requests_v2")
+          .update({
+            status: "rejected",
+            approved_by: user.email ?? user.id,
+          })
+          .eq("id", body.request_id)
+          .eq("status", "pending")
+          .select()
+          .single();
 
         if (error) throw error;
 
-        return jsonResponse({ ...data, duration_ms: Date.now() - startTime });
+        return jsonResponse({
+          success: true,
+          request: data,
+          duration_ms: Date.now() - startTime,
+        });
       }
 
       case "cancel": {
@@ -135,61 +172,61 @@ Deno.serve(async (req: Request) => {
           return jsonResponse({ error: "Missing request_id" }, 400);
         }
 
-        const { data, error } = await supabase.rpc("rpc_cancel_leave_request", {
-          p_request_id: body.request_id,
-          p_cancelled_by: body.user_id ?? null,
-        });
-
-        if (error) throw error;
-
-        return jsonResponse({ ...data, duration_ms: Date.now() - startTime });
-      }
-
-      case "balance": {
-        if (!body.user_id) {
-          return jsonResponse({ error: "Missing user_id" }, 400);
-        }
-
-        const year = body.year ?? new Date().getFullYear();
-
         const { data, error } = await supabase
-          .from("leave_balances")
-          .select(`
-            id, year, annual_entitlement, used_days, remaining_days,
-            leave_types!inner(leave_type)
-          `)
-          .eq("user_id", body.user_id)
-          .eq("year", year);
+          .from("leave_requests_v2")
+          .update({ status: "cancelled" })
+          .eq("id", body.request_id)
+          .in("status", ["pending", "approved"])
+          .select()
+          .single();
 
         if (error) throw error;
-
-        // Get pending requests
-        const { data: pending } = await supabase
-          .from("leave_requests")
-          .select("id, start_date, end_date, days_count, leave_types!inner(leave_type)")
-          .eq("user_id", body.user_id)
-          .eq("status", "pending");
 
         return jsonResponse({
           success: true,
-          user_id: body.user_id,
-          year,
-          balances: data ?? [],
-          pending_requests: pending ?? [],
+          request: data,
           duration_ms: Date.now() - startTime,
         });
       }
 
-      case "init_year": {
-        const year = body.year ?? new Date().getFullYear();
+      case "my_requests": {
+        if (!body.staff_id) {
+          return jsonResponse({ error: "Missing staff_id" }, 400);
+        }
 
-        const { data, error } = await supabase.rpc("rpc_initialize_leave_balances", {
-          p_year: year,
-        });
+        const { data, error } = await supabase
+          .from("leave_requests_v2")
+          .select("*")
+          .eq("staff_id", body.staff_id)
+          .order("start_date", { ascending: false })
+          .limit(50);
 
         if (error) throw error;
 
-        return jsonResponse({ ...data, duration_ms: Date.now() - startTime });
+        return jsonResponse({
+          success: true,
+          requests: data ?? [],
+          duration_ms: Date.now() - startTime,
+        });
+      }
+
+      case "pending": {
+        // Manager view: use enriched view with staff names
+        const { data, error } = await supabase
+          .from("leave_requests_v2_enriched")
+          .select("*")
+          .eq("status", "pending")
+          .order("start_date", { ascending: false })
+          .limit(100);
+
+        if (error) throw error;
+
+        return jsonResponse({
+          success: true,
+          requests: data ?? [],
+          total: (data ?? []).length,
+          duration_ms: Date.now() - startTime,
+        });
       }
 
       case "team_calendar": {
@@ -197,19 +234,12 @@ Deno.serve(async (req: Request) => {
           return jsonResponse({ error: "Missing start_date and end_date" }, 400);
         }
 
-        // Use v_leave_dashboard view which properly joins employees via user_id
-        let query = supabase
-          .from("v_leave_dashboard")
-          .select("request_id, employee_name, employee_code, department, leave_type, start_date, end_date, days_count, status, reason")
+        const { data, error } = await supabase
+          .from("leave_requests_v2_enriched")
+          .select("*")
           .eq("status", "approved")
           .gte("end_date", body.start_date)
           .lte("start_date", body.end_date);
-
-        if (body.department) {
-          query = query.eq("department", body.department);
-        }
-
-        const { data, error } = await query;
 
         if (error) throw error;
 
@@ -217,14 +247,13 @@ Deno.serve(async (req: Request) => {
           success: true,
           period: { start: body.start_date, end: body.end_date },
           leave_entries: data ?? [],
-          total: (data ?? []).length,
           duration_ms: Date.now() - startTime,
         });
       }
 
       default:
         return jsonResponse(
-          { error: `Unknown operation: ${operation}. Valid: submit, approve, reject, cancel, balance, init_year, team_calendar` },
+          { error: `Unknown operation: ${operation}. Valid: submit, approve, reject, cancel, my_requests, pending, team_calendar` },
           400
         );
     }
@@ -236,4 +265,3 @@ Deno.serve(async (req: Request) => {
     );
   }
 });
-

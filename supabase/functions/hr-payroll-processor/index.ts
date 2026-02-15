@@ -188,7 +188,8 @@ Deno.serve(async (req: Request) => {
 
         if (runError) throw runError;
 
-        // Update staff salary loans (deduct monthly payments)
+        // Update staff loans (deduct monthly payments)
+        // Uses REAL table: staff_loans
         const { data: payslips } = await supabase
           .from("payslips")
           .select("employee_id, loan_deduction")
@@ -198,18 +199,18 @@ Deno.serve(async (req: Request) => {
         if (payslips) {
           for (const ps of payslips) {
             const { data: loans } = await supabase
-              .from("staff_salary_loans")
-              .select("id, outstanding_balance, monthly_deduction")
+              .from("staff_loans")
+              .select("id, remaining_balance, monthly_installment")
               .eq("employee_id", ps.employee_id)
               .eq("status", "active");
 
             if (loans) {
               for (const loan of loans) {
-                const newBalance = Math.max(0, loan.outstanding_balance - loan.monthly_deduction);
+                const newBalance = Math.max(0, loan.remaining_balance - loan.monthly_installment);
                 await supabase
-                  .from("staff_salary_loans")
+                  .from("staff_loans")
                   .update({
-                    outstanding_balance: newBalance,
+                    remaining_balance: newBalance,
                     status: newBalance <= 0 ? "completed" : "active",
                     updated_at: new Date().toISOString(),
                   })

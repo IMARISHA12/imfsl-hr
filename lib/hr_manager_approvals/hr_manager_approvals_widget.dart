@@ -124,10 +124,14 @@ class _HrManagerApprovalsWidgetState extends State<HrManagerApprovalsWidget> {
 
   Widget _buildRequestCard(BuildContext context, Map<String, dynamic> req) {
     final leaveType = req['leave_type'] ?? '';
-    final employeeName = req['employee_name'] ?? 'N/A';
+    final employeeName = req['staff_name'] ?? 'N/A';
     final startDate = _formatDate(req['start_date']);
     final endDate = _formatDate(req['end_date']);
-    final days = req['days_count'] ?? '';
+    final dtStart = DateTime.tryParse(req['start_date']?.toString() ?? '');
+    final dtEnd = DateTime.tryParse(req['end_date']?.toString() ?? '');
+    final days = (dtStart != null && dtEnd != null)
+        ? '${dtEnd.difference(dtStart).inDays + 1}'
+        : '';
     final reason = req['reason'] as String? ?? '';
 
     return Container(
@@ -311,7 +315,7 @@ class _HrManagerApprovalsWidgetState extends State<HrManagerApprovalsWidget> {
                     try {
                       final edgeFnBody = {
                         'operation': action,
-                        'request_id': req['request_id'],
+                        'request_id': req['id'],
                         'manager_comment':
                             _model.commentController?.text ?? '',
                         'processed_by': currentUserEmail,

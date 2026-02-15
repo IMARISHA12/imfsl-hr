@@ -517,12 +517,12 @@ class _HrPayslipsWidgetState extends State<HrPayslipsWidget>
       itemBuilder: (context, index) {
         final loan = _model.loans[index];
         final isActive = loan['status'] == 'active';
-        final progress = (loan['outstanding_balance'] is num &&
-                loan['loan_amount'] is num &&
-                (loan['loan_amount'] as num) > 0)
+        final progress = (loan['remaining_balance'] is num &&
+                loan['approved_amount'] is num &&
+                (loan['approved_amount'] as num) > 0)
             ? 1.0 -
-                ((loan['outstanding_balance'] as num) /
-                    (loan['loan_amount'] as num))
+                ((loan['remaining_balance'] as num) /
+                    (loan['approved_amount'] as num))
             : 0.0;
 
         return Container(
@@ -572,9 +572,9 @@ class _HrPayslipsWidgetState extends State<HrPayslipsWidget>
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  _loanStat('Kiasi', 'TZS ${_fmt(loan['loan_amount'])}'),
-                  _loanStat('Baki', 'TZS ${_fmt(loan['outstanding_balance'])}'),
-                  _loanStat('Kwa Mwezi', 'TZS ${_fmt(loan['monthly_deduction'])}'),
+                  _loanStat('Kiasi', 'TZS ${_fmt(loan['approved_amount'])}'),
+                  _loanStat('Baki', 'TZS ${_fmt(loan['remaining_balance'])}'),
+                  _loanStat('Kwa Mwezi', 'TZS ${_fmt(loan['monthly_installment'])}'),
                 ],
               ),
               const SizedBox(height: 10.0),

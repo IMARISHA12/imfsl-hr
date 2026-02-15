@@ -48,8 +48,21 @@ class _HrDashboardWidgetState extends State<HrDashboardWidget> {
 
   Future<void> _loadDashboardData() async {
     try {
-      final kpis = await HrService.instance.getDashboardKpis();
-      final unread = await HrService.instance.getUnreadNotificationCount();
+      final currentUserUid = SupaFlow.client.auth.currentUser?.id ?? '';
+      // Build KPIs from real tables instead of missing RPC
+      final staffCount = await SupaFlow.client.from('staff').select('id').eq('active', true);
+      final pendingLeaves = await SupaFlow.client.from('leave_requests_v2').select('id').eq('status', 'pending');
+      final todayAttendance = await SupaFlow.client.from('attendance_v2_today').select('id');
+      final totalStaff = (staffCount as List).length;
+      final kpis = <String, dynamic>{
+        'headcount': {'active': totalStaff, 'new_hires_this_month': 0},
+        'attendance': {'rate_this_month': totalStaff > 0 ? (todayAttendance as List).length * 100 ~/ totalStaff : 0},
+        'leave': {'pending_requests': (pendingLeaves as List).length, 'on_leave_today': 0},
+        'performance': {'avg_score': 0, 'pending_reviews': 0},
+        'payroll': {'monthly_cost': 0, 'avg_salary': 0},
+        'alerts': {'expiring_contracts': 0},
+      };
+      final unread = await HrService.instance.getUnreadNotificationCount(currentUserUid);
       _model.kpiData = kpis;
       _model.unreadCount = unread;
       _model.isLoading = false;

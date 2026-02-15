@@ -45,21 +45,17 @@ class _HrLeaveWidgetState extends State<HrLeaveWidget>
 
   Future<void> _loadData() async {
     try {
-      final balanceResp =
+      _model.balances =
           await HrService.instance.getLeaveBalance(currentUserUid);
-      final myRequests =
+      _model.requests =
           await HrService.instance.getMyLeaveRequests(currentUserUid);
 
-      // Load leave types for the request form
+      // Load leave types for the request form (REAL table columns)
       final types = await SupaFlow.client
           .from('leave_types')
-          .select('id, leave_type, max_days_per_year')
-          .eq('is_active', true)
-          .order('leave_type');
+          .select('id, code, name, days_allowed')
+          .order('name');
 
-      _model.balances =
-          List<Map<String, dynamic>>.from(balanceResp['balances'] ?? []);
-      _model.requests = myRequests;
       _model.leaveTypes = List<Map<String, dynamic>>.from(types);
       _model.isLoading = false;
     } catch (e) {
@@ -166,7 +162,7 @@ class _HrLeaveWidgetState extends State<HrLeaveWidget>
       itemBuilder: (context, index) {
         final b = _model.balances[index];
         final leaveType =
-            (b['leave_types'] as Map<String, dynamic>?)?['leave_type'] ?? 'N/A';
+            (b['leave_types'] as Map<String, dynamic>?)?['name'] ?? 'N/A';
         final total = (b['annual_entitlement'] as num?) ?? 0;
         final used = (b['used_days'] as num?) ?? 0;
         final remaining = (b['remaining_days'] as num?) ?? 0;
@@ -266,8 +262,7 @@ class _HrLeaveWidgetState extends State<HrLeaveWidget>
         itemCount: _model.requests.length,
       itemBuilder: (context, index) {
         final r = _model.requests[index];
-        final leaveType =
-            (r['leave_types'] as Map<String, dynamic>?)?['leave_type'] ?? '';
+        final leaveType = r['leave_type'] as String? ?? '';
         final status = r['status'] ?? 'pending';
         final statusColors = {
           'pending': const Color(0xFFF59E0B),
@@ -323,7 +318,7 @@ class _HrLeaveWidgetState extends State<HrLeaveWidget>
               ),
               const SizedBox(height: 6.0),
               Text(
-                '${r['start_date'] ?? ''} - ${r['end_date'] ?? ''} (siku ${r['days_count'] ?? ''})',
+                '${r['start_date'] ?? ''} - ${r['end_date'] ?? ''}',
                 style: FlutterFlowTheme.of(context).bodySmall.override(
                       font: GoogleFonts.inter(),
                       color: FlutterFlowTheme.of(context).secondaryText,
@@ -349,7 +344,7 @@ class _HrLeaveWidgetState extends State<HrLeaveWidget>
                   child: TextButton(
                     onPressed: () async {
                       await HrService.instance
-                          .cancelLeaveRequest(r['id'], currentUserUid);
+                          .cancelLeaveRequest(r['id']);
                       await _loadData();
                       if (context.mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
@@ -401,8 +396,8 @@ class _HrLeaveWidgetState extends State<HrLeaveWidget>
             value: _model.selectedLeaveTypeId,
             items: _model.leaveTypes
                 .map((lt) => DropdownMenuItem<String>(
-                      value: lt['id'] as String,
-                      child: Text(lt['leave_type'] as String),
+                      value: lt['name'] as String,
+                      child: Text(lt['name'] as String),
                     ))
                 .toList(),
             onChanged: (val) {
@@ -473,8 +468,8 @@ class _HrLeaveWidgetState extends State<HrLeaveWidget>
                       safeSetState(() {});
                       try {
                         await HrService.instance.submitLeaveRequest(
-                          userId: currentUserUid,
-                          leaveTypeId: _model.selectedLeaveTypeId!,
+                          staffId: currentUserUid,
+                          leaveType: _model.selectedLeaveTypeId!,
                           startDate:
                               _model.startDate!.toIso8601String().split('T')[0],
                           endDate:

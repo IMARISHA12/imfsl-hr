@@ -36,12 +36,12 @@ class _HrNotificationsWidgetState extends State<HrNotificationsWidget> {
 
   Future<void> _loadNotifications() async {
     try {
-      final result = await HrService.instance.getNotifications(
+      final currentUserUid = SupaFlow.client.auth.currentUser?.id ?? '';
+      _model.notifications = await HrService.instance.getNotifications(
+        currentUserUid,
         limit: 50,
         unreadOnly: _model.unreadOnly,
       );
-      _model.notifications = List<Map<String, dynamic>>.from(
-          result['notifications'] ?? []);
       _model.isLoading = false;
     } catch (e) {
       _model.isLoading = false;
@@ -165,9 +165,9 @@ class _HrNotificationsWidgetState extends State<HrNotificationsWidget> {
   Widget _buildNotificationTile(
       BuildContext context, Map<String, dynamic> n) {
     final isRead = n['is_read'] == true;
-    final eventType = n['event_type'] as String? ?? '';
+    final eventType = n['type'] as String? ?? '';
     final title = n['title'] as String? ?? '';
-    final body = n['body'] as String? ?? '';
+    final body = n['message'] as String? ?? '';
     final createdAt = n['created_at'] as String? ?? '';
 
     final iconMap = {

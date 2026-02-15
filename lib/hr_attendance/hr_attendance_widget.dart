@@ -66,11 +66,20 @@ class _HrAttendanceWidgetState extends State<HrAttendanceWidget> {
       return;
     }
     try {
-      final result = await HrService.instance.getMyAttendance(_staffId!);
-      final records =
-          List<Map<String, dynamic>>.from(result['records'] ?? []);
-      final summary =
-          Map<String, dynamic>.from(result['summary'] ?? {});
+      final records = await HrService.instance.getMyAttendance(_staffId!);
+
+      // Compute summary from records
+      int daysPresent = records.length;
+      int daysLate = records.where((r) => r['is_late'] == true).length;
+      int totalMinutes = 0;
+      for (final r in records) {
+        totalMinutes += (r['work_minutes'] as int?) ?? 0;
+      }
+      final summary = <String, dynamic>{
+        'days_present': daysPresent,
+        'days_late': daysLate,
+        'total_hours': totalMinutes / 60.0,
+      };
 
       _model.records = records;
       _model.summary = summary;
@@ -82,8 +91,8 @@ class _HrAttendanceWidgetState extends State<HrAttendanceWidget> {
         orElse: () => <String, dynamic>{},
       );
       _model.isClockedIn =
-          todayRecord['clock_in'] != null && todayRecord['clock_out'] == null;
-      _model.clockInTime = todayRecord['clock_in'] as String?;
+          todayRecord['clock_in_time'] != null && todayRecord['clock_out_time'] == null;
+      _model.clockInTime = todayRecord['clock_in_time'] as String?;
       _model.isLoading = false;
     } catch (e) {
       _model.isLoading = false;
@@ -319,9 +328,10 @@ class _HrAttendanceWidgetState extends State<HrAttendanceWidget> {
         const SizedBox(height: 8.0),
         ...(_model.records.map((r) {
           final isLate = r['is_late'] == true;
-          final hours = (r['hours_worked'] as num?)?.toStringAsFixed(1) ?? '-';
-          final clockIn = r['clock_in'] ?? '-';
-          final clockOut = r['clock_out'] ?? '-';
+          final workMins = r['work_minutes'] as int?;
+          final hours = workMins != null ? (workMins / 60).toStringAsFixed(1) : '-';
+          final clockIn = r['clock_in_time'] ?? '-';
+          final clockOut = r['clock_out_time'] ?? '-';
 
           return Container(
             margin: const EdgeInsets.only(bottom: 8.0),
@@ -404,7 +414,7 @@ class _HrAttendanceWidgetState extends State<HrAttendanceWidget> {
     try {
       await HrService.instance.clockOut(
         _staffId!,
-        dailyReport: _model.reportController?.text,
+        notes: _model.reportController?.text,
       );
       _model.reportController?.clear();
       await _loadData();
