@@ -456,12 +456,11 @@ GRANT SELECT ON public.v_repayment_history TO service_role, authenticated;
 -- │                                                                        │
 -- │ Run in order:                                                          │
 -- │   1. 006_fineract_integration.sql   (Fineract core banking integration)│
--- │   2. 006b_hr_prerequisite_tables.sql (leave_types, leave_requests,    │
--- │      leave_balances, attendance_records + Tanzania leave type seeds)   │
--- │   3. 007_hr_business_logic.sql      (Payroll, Leave, Attendance, Perf.)│
--- │   4. 008_scheduled_tasks.sql        (Cron jobs, arrears, leave accrual)│
--- │   5. 009_rls_policies_and_integration.sql (RLS, notifications, audit) │
--- │   6. 010_staff_performance_monthly.sql (KPI snapshots, dashboard fn)  │
+-- │   2. 007_hr_business_logic.sql      (Payroll, Leave, Attendance, Perf.)│
+-- │   3. 008_scheduled_tasks.sql        (Cron jobs, arrears, leave accrual)│
+-- │   4. 009_rls_policies_and_integration.sql (RLS, notifications, audit) │
+-- │   5. 010_staff_performance_monthly.sql (KPI snapshots, dashboard fn)  │
+-- │   6. 011_rls_real_v2v3_tables.sql   (RLS for v2/v3 tables used by app)│
 -- │                                                                        │
 -- │ These are too large for a single SQL Editor run.                       │
 -- └─────────────────────────────────────────────────────────────────────────┘
