@@ -76,6 +76,183 @@ class GetStaffMonthlyStatsCall {
   }
 }
 
+// ============================================================================
+// MALI YA KAMPUNI - Company Assets & Technology Monitoring API Calls
+// ============================================================================
+
+const _kSupabaseApiKey =
+    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx6eWl4YXpqcXVvdWljZnNmenp1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTY2NDMxNDAsImV4cCI6MjA3MjIxOTE0MH0.2HD_QpH1qug5ieerXukAtEP9bCxbSVBht7khyUGtaz8';
+const _kSupabaseBaseUrl = 'https://api.admin-imarishamaisha.co.tz';
+
+Map<String, String> _supabaseHeaders() => {
+      'apikey': _kSupabaseApiKey,
+      'Authorization': 'Bearer $_kSupabaseApiKey',
+      'Content-Type': 'application/json',
+    };
+
+/// Get Company Asset KPIs (Total Value, Depreciation, Maintenance Due, etc.)
+class GetCompanyAssetKpisCall {
+  static Future<ApiCallResponse> call() async {
+    return ApiManager.instance.makeApiCall(
+      callName: 'getCompanyAssetKpis',
+      apiUrl: '$_kSupabaseBaseUrl/rest/v1/rpc/fn_company_asset_kpis',
+      callType: ApiCallType.POST,
+      headers: _supabaseHeaders(),
+      params: {},
+      body: '{}',
+      bodyType: BodyType.JSON,
+      returnBody: true,
+      encodeBodyUtf8: false,
+      decodeUtf8: false,
+      cache: false,
+      isStreamingApi: false,
+      alwaysAllowBody: false,
+    );
+  }
+}
+
+/// Register a new company asset
+class RegisterCompanyAssetCall {
+  static Future<ApiCallResponse> call({
+    required String pAssetName,
+    required String pAssetCategory,
+    String? pSerialNumber,
+    String? pRegistrationNumber,
+    String? pPurchaseDate,
+    double pPurchasePrice = 0,
+    int pUsefulLifeYears = 5,
+    String pDepreciationMethod = 'straight_line',
+    String? pLocationDescription,
+    String? pAssignedDepartment,
+    String? pDescription,
+    String? pPhotoUrl,
+  }) async {
+    final ffApiRequestBody = json.encode({
+      'p_asset_name': pAssetName,
+      'p_asset_category': pAssetCategory,
+      'p_serial_number': pSerialNumber,
+      'p_registration_number': pRegistrationNumber,
+      'p_purchase_date': pPurchaseDate ?? DateTime.now().toIso8601String().split('T').first,
+      'p_purchase_price': pPurchasePrice,
+      'p_useful_life_years': pUsefulLifeYears,
+      'p_depreciation_method': pDepreciationMethod,
+      'p_location_description': pLocationDescription,
+      'p_assigned_department': pAssignedDepartment,
+      'p_description': pDescription,
+      'p_photo_url': pPhotoUrl,
+    });
+    return ApiManager.instance.makeApiCall(
+      callName: 'registerCompanyAsset',
+      apiUrl: '$_kSupabaseBaseUrl/rest/v1/rpc/fn_register_company_asset',
+      callType: ApiCallType.POST,
+      headers: _supabaseHeaders(),
+      params: {},
+      body: ffApiRequestBody,
+      bodyType: BodyType.JSON,
+      returnBody: true,
+      encodeBodyUtf8: false,
+      decodeUtf8: false,
+      cache: false,
+      isStreamingApi: false,
+      alwaysAllowBody: false,
+    );
+  }
+}
+
+/// Calculate asset depreciation
+class CalculateAssetDepreciationCall {
+  static Future<ApiCallResponse> call({
+    required String pAssetId,
+  }) async {
+    final ffApiRequestBody = json.encode({
+      'p_asset_id': pAssetId,
+    });
+    return ApiManager.instance.makeApiCall(
+      callName: 'calculateAssetDepreciation',
+      apiUrl: '$_kSupabaseBaseUrl/rest/v1/rpc/fn_calculate_asset_depreciation',
+      callType: ApiCallType.POST,
+      headers: _supabaseHeaders(),
+      params: {},
+      body: ffApiRequestBody,
+      bodyType: BodyType.JSON,
+      returnBody: true,
+      encodeBodyUtf8: false,
+      decodeUtf8: false,
+      cache: false,
+      isStreamingApi: false,
+      alwaysAllowBody: false,
+    );
+  }
+}
+
+/// Run AI OCR Fraud Analysis on a scan
+class RunOcrFraudAnalysisCall {
+  static Future<ApiCallResponse> call({
+    required String pScanId,
+  }) async {
+    final ffApiRequestBody = json.encode({
+      'p_scan_id': pScanId,
+    });
+    return ApiManager.instance.makeApiCall(
+      callName: 'runOcrFraudAnalysis',
+      apiUrl: '$_kSupabaseBaseUrl/rest/v1/rpc/fn_ocr_fraud_analysis',
+      callType: ApiCallType.POST,
+      headers: _supabaseHeaders(),
+      params: {},
+      body: ffApiRequestBody,
+      bodyType: BodyType.JSON,
+      returnBody: true,
+      encodeBodyUtf8: false,
+      decodeUtf8: false,
+      cache: false,
+      isStreamingApi: false,
+      alwaysAllowBody: false,
+    );
+  }
+}
+
+/// Get Technology Health Dashboard
+class GetTechHealthDashboardCall {
+  static Future<ApiCallResponse> call() async {
+    return ApiManager.instance.makeApiCall(
+      callName: 'getTechHealthDashboard',
+      apiUrl: '$_kSupabaseBaseUrl/rest/v1/rpc/fn_tech_health_dashboard',
+      callType: ApiCallType.POST,
+      headers: _supabaseHeaders(),
+      params: {},
+      body: '{}',
+      bodyType: BodyType.JSON,
+      returnBody: true,
+      encodeBodyUtf8: false,
+      decodeUtf8: false,
+      cache: false,
+      isStreamingApi: false,
+      alwaysAllowBody: false,
+    );
+  }
+}
+
+/// Get Fleet GPS Summary
+class GetFleetGpsSummaryCall {
+  static Future<ApiCallResponse> call() async {
+    return ApiManager.instance.makeApiCall(
+      callName: 'getFleetGpsSummary',
+      apiUrl: '$_kSupabaseBaseUrl/rest/v1/rpc/fn_fleet_gps_summary',
+      callType: ApiCallType.POST,
+      headers: _supabaseHeaders(),
+      params: {},
+      body: '{}',
+      bodyType: BodyType.JSON,
+      returnBody: true,
+      encodeBodyUtf8: false,
+      decodeUtf8: false,
+      cache: false,
+      isStreamingApi: false,
+      alwaysAllowBody: false,
+    );
+  }
+}
+
 class ApiPagingParams {
   int nextPageNumber = 0;
   int numItems = 0;

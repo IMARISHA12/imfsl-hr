@@ -5,6 +5,12 @@ export '../supabase.dart';
 export 'row.dart';
 export 'table.dart';
 
+export 'tables/company_assets.dart';
+export 'tables/asset_maintenance_records.dart';
+export 'tables/asset_ocr_scans.dart';
+export 'tables/asset_depreciation_ledger.dart';
+export 'tables/asset_transfers.dart';
+export 'tables/tech_monitoring_snapshots.dart';
 export 'tables/gl_periods.dart';
 export 'tables/scheduled_report_recipients.dart';
 export 'tables/guardian_alerts.dart';
