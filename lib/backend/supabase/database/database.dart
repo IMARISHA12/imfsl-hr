@@ -448,3 +448,15 @@ export 'tables/collection_scheduled_contacts.dart';
 export 'tables/vendor_cache_metrics.dart';
 export 'tables/petty_cash_registers.dart';
 export 'tables/z_archive_role_permissions.dart';
+
+// Migration 013: Mali ya Kampuni — Company Assets, OCR & Fraud Detection
+export 'tables/company_assets.dart';
+export 'tables/asset_depreciation.dart';
+export 'tables/asset_maintenance.dart';
+export 'tables/asset_transfer_history.dart';
+export 'tables/asset_attachments.dart';
+export 'tables/attachment_ocr_scans.dart';
+export 'tables/attachment_fraud_checks.dart';
+export 'tables/fraud_detection_rules.dart';
+export 'tables/tech_monitoring_checks.dart';
+export 'tables/asset_system_alerts.dart';

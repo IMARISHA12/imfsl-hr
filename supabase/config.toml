@@ -14,3 +14,6 @@ verify_jwt = false
 
 [functions.hr-performance-review]
 verify_jwt = false
+
+[functions.asset-ocr-fraud-detector]
+verify_jwt = false

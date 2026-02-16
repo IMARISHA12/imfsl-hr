@@ -11,3 +11,5 @@ export '/hr_notifications/hr_notifications_widget.dart'
 export '/hr_profile/hr_profile_widget.dart' show HrProfileWidget;
 export '/hr_manager_approvals/hr_manager_approvals_widget.dart'
     show HrManagerApprovalsWidget;
+export '/mali_ya_kampuni/mali_ya_kampuni_widget.dart'
+    show MaliYaKampuniWidget;

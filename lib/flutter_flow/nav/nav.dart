@@ -152,6 +152,12 @@ GoRouter createRouter(AppStateNotifier appStateNotifier) => GoRouter(
           requireAuth: true,
           builder: (context, params) => HrManagerApprovalsWidget(),
         ),
+        FFRoute(
+          name: MaliYaKampuniWidget.routeName,
+          path: MaliYaKampuniWidget.routePath,
+          requireAuth: true,
+          builder: (context, params) => MaliYaKampuniWidget(),
+        ),
       ].map((r) => r.toRoute(appStateNotifier)).toList(),
     );
 
