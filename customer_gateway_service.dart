@@ -1,7 +1,7 @@
 // IMFSL Customer Gateway Service
 // ================================
 // Thin service layer that wraps all calls to the `imfsl-customer-gateway`
-// Supabase edge function. One method per action (21 actions + helpers).
+// Supabase edge function. One method per action (30 actions + helpers).
 //
 // Usage:
 //   final service = CustomerGatewayService(client: Supabase.instance.client);
@@ -287,6 +287,115 @@ class CustomerGatewayService {
   /// Returns the latest KYC submission status. Works pre-registration.
   Future<Map<String, dynamic>> getKycStatus() async {
     final result = await _call('kyc_status');
+    return _asMap(result);
+  }
+
+  // ═══════════════════════════════════════════════════════════════════
+  // INSTANT LOAN (Mkopo Chap Chap)
+  // ═══════════════════════════════════════════════════════════════════
+
+  /// Registers or updates a device fingerprint. Returns the device record.
+  Future<Map<String, dynamic>> registerDevice(
+      Map<String, dynamic> deviceData) async {
+    final result = await _call('register_device', deviceData);
+    return _asMap(result);
+  }
+
+  /// Pre-qualifies the customer for an instant loan.
+  /// Returns: qualified, max_amount, credit_score, device_trusted, checks, product.
+  Future<Map<String, dynamic>> instantLoanPrequalify({
+    String? deviceId,
+  }) async {
+    final result = await _call('instant_loan_prequalify', {
+      if (deviceId != null) 'device_id': deviceId,
+    });
+    return _asMap(result);
+  }
+
+  /// Submits an instant loan application and runs the auto-decision engine.
+  /// Returns: application_id, decision, disbursement (if auto-approved).
+  Future<Map<String, dynamic>> instantLoanApply({
+    required double requestedAmount,
+    required int tenureMonths,
+    String? purpose,
+    String? phoneNumber,
+    String? deviceDbId,
+  }) async {
+    final result = await _call('instant_loan_apply', {
+      'requested_amount': requestedAmount,
+      'tenure_months': tenureMonths,
+      if (purpose != null) 'purpose': purpose,
+      if (phoneNumber != null) 'phone_number': phoneNumber,
+      if (deviceDbId != null) 'device_db_id': deviceDbId,
+    });
+    return _asMap(result);
+  }
+
+  /// Polls the status of an instant loan application.
+  /// Returns: application, decision, disbursement.
+  Future<Map<String, dynamic>> instantLoanStatus(
+      String applicationId) async {
+    final result = await _call('instant_loan_status', {
+      'application_id': applicationId,
+    });
+    return _asMap(result);
+  }
+
+  /// Requests an OTP for high-value instant loan disbursement.
+  /// Returns: otp_sent, phone_number, expires_in_seconds.
+  Future<Map<String, dynamic>> instantLoanRequestOtp(
+      String applicationId) async {
+    final result = await _call('instant_loan_request_otp', {
+      'application_id': applicationId,
+    });
+    return _asMap(result);
+  }
+
+  /// Verifies OTP and triggers disbursement if valid.
+  /// Returns: verified, disbursement (if verified).
+  Future<Map<String, dynamic>> instantLoanVerifyOtp(
+      String applicationId, String otpCode) async {
+    final result = await _call('instant_loan_verify_otp', {
+      'application_id': applicationId,
+      'otp_code': otpCode,
+    });
+    return _asMap(result);
+  }
+
+  /// Confirms disbursement for loans below OTP threshold.
+  /// Returns: loan_id, disbursement_id, amount, phone, status.
+  Future<Map<String, dynamic>> instantLoanConfirmDisburse(
+      String applicationId, {String? phoneNumber}) async {
+    final result = await _call('instant_loan_confirm_disburse', {
+      'application_id': applicationId,
+      if (phoneNumber != null) 'phone_number': phoneNumber,
+    });
+    return _asMap(result);
+  }
+
+  // ═══════════════════════════════════════════════════════════════════
+  // PAYMENTS & COLLECTIONS (Customer View)
+  // ═══════════════════════════════════════════════════════════════════
+
+  /// Returns upcoming payment installments across all active loans,
+  /// plus a summary of total due this month and total overdue.
+  Future<Map<String, dynamic>> getUpcomingPayments({int limit = 10}) async {
+    final result = await _call('upcoming_payments', {'limit': limit});
+    return _asMap(result);
+  }
+
+  /// Returns payment history for a specific loan, including loan summary
+  /// and paginated list of completed repayment transactions.
+  Future<Map<String, dynamic>> getPaymentHistory({
+    required String loanId,
+    int limit = 20,
+    int offset = 0,
+  }) async {
+    final result = await _call('payment_history', {
+      'loan_id': loanId,
+      'limit': limit,
+      'offset': offset,
+    });
     return _asMap(result);
   }
 

@@ -29,6 +29,9 @@ import 'credit_score_widget.dart';
 import 'notifications_center_widget.dart';
 import 'customer_profile_widget.dart';
 import 'mpesa_payment_widget.dart';
+import 'loan_prequalification_card.dart';
+import 'payment_reminder_card.dart';
+import 'payment_history_widget.dart';
 
 enum _OverlayScreen {
   loanProducts,
@@ -37,6 +40,8 @@ enum _OverlayScreen {
   creditScore,
   kyc,
   mpesaPayment,
+  instantLoan,
+  paymentHistory,
 }
 
 class CustomerAppHomeScreen extends StatefulWidget {
@@ -97,6 +102,18 @@ class CustomerAppHomeScreen extends StatefulWidget {
     this.onInitiatePayment,
     this.onCheckPaymentStatus,
     this.onPaymentComplete,
+    // ── Instant Loan callbacks ──
+    this.prequalification,
+    this.onInstantLoanApplyNow,
+    this.onRefreshPrequalification,
+    // ── Payments & Collections ────────────────────────────────────
+    this.upcomingPayments = const {},
+    this.isUpcomingLoading = false,
+    this.paymentHistoryData = const {},
+    this.isPaymentHistoryLoading = false,
+    this.onRefreshUpcomingPayments,
+    this.onLoadPaymentHistory,
+    this.onLoadMorePaymentHistory,
     // ── Terminal callbacks ──
     this.onLogout,
     this.onViewAllTransactions,
@@ -176,6 +193,20 @@ class CustomerAppHomeScreen extends StatefulWidget {
   final Future<Map<String, dynamic>> Function(String transactionId)?
       onCheckPaymentStatus;
   final Function(Map<String, dynamic> result)? onPaymentComplete;
+
+  // ── Instant Loan (Mkopo Chap Chap) ────────────────────────────────
+  final Map<String, dynamic>? prequalification;
+  final VoidCallback? onInstantLoanApplyNow;
+  final VoidCallback? onRefreshPrequalification;
+
+  // ── Payments & Collections ──────────────────────────────────────
+  final Map<String, dynamic> upcomingPayments;
+  final bool isUpcomingLoading;
+  final Map<String, dynamic> paymentHistoryData;
+  final bool isPaymentHistoryLoading;
+  final VoidCallback? onRefreshUpcomingPayments;
+  final Function(String loanId, {int limit, int offset})? onLoadPaymentHistory;
+  final VoidCallback? onLoadMorePaymentHistory;
 
   // ── Terminal callbacks ─────────────────────────────────────────────
   final VoidCallback? onLogout;
@@ -420,6 +451,17 @@ class _CustomerAppHomeScreenState extends State<CustomerAppHomeScreen>
           },
           onCancel: _closeOverlay,
         );
+      case _OverlayScreen.instantLoan:
+        title = 'Instant Loan';
+        child = const SizedBox.shrink();
+      case _OverlayScreen.paymentHistory:
+        title = 'Payment History';
+        child = PaymentHistoryWidget(
+          historyData: widget.paymentHistoryData,
+          isLoading: widget.isPaymentHistoryLoading,
+          onLoadMore: widget.onLoadMorePaymentHistory,
+          onBack: _closeOverlay,
+        );
     }
 
     return Scaffold(
@@ -457,7 +499,38 @@ class _CustomerAppHomeScreenState extends State<CustomerAppHomeScreen>
               const SizedBox(height: 16),
             ],
             _buildBalanceCard(),
-            const SizedBox(height: 20),
+            const SizedBox(height: 16),
+            PaymentReminderCard(
+              upcomingData: widget.upcomingPayments,
+              isLoading: widget.isUpcomingLoading,
+              onPayNow: () => _openOverlay(_OverlayScreen.mpesaPayment),
+              onViewAll: () {
+                // Load history for the first loan in upcoming installments
+                final installments = widget.upcomingPayments['installments'];
+                if (installments is List && installments.isNotEmpty) {
+                  final loanId = installments[0]['loan_id']?.toString() ?? '';
+                  if (loanId.isNotEmpty) {
+                    widget.onLoadPaymentHistory?.call(loanId, limit: 20, offset: 0);
+                  }
+                }
+                _openOverlay(_OverlayScreen.paymentHistory);
+              },
+              onRefresh: widget.onRefreshUpcomingPayments,
+            ),
+            const SizedBox(height: 16),
+            if (widget.prequalification != null) ...[
+              LoanPrequalificationCard(
+                qualified: widget.prequalification!['qualified'] == true,
+                maxAmount: _toDouble(widget.prequalification!['max_amount']),
+                creditScore: _toDouble(widget.prequalification!['credit_score']),
+                kycApproved: widget.prequalification!['kyc_approved'] == true,
+                deviceTrusted: widget.prequalification!['device_trusted'] == true,
+                noArrears: widget.prequalification!['no_arrears'] == true,
+                onApplyNow: () => widget.onInstantLoanApplyNow?.call(),
+                onRefresh: () => widget.onRefreshPrequalification?.call(),
+              ),
+              const SizedBox(height: 16),
+            ],
             _buildQuickActionsGrid(),
             const SizedBox(height: 20),
             if (_firstActiveLoan != null) ...[
@@ -683,6 +756,10 @@ class _CustomerAppHomeScreenState extends State<CustomerAppHomeScreen>
 
   Widget _buildQuickActionsGrid() {
     final actions = [
+      if (widget.prequalification?['qualified'] == true)
+        _QuickAction(Icons.bolt, 'Get Money', const Color(0xFFE65100), () {
+          widget.onInstantLoanApplyNow?.call();
+        }),
       _QuickAction(Icons.payment, 'Pay Loan', const Color(0xFF2E7D32), () {
         _openOverlay(_OverlayScreen.mpesaPayment);
       }),

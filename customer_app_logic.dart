@@ -24,6 +24,9 @@ import 'customer_gateway_service.dart';
 import 'customer_app_home_screen.dart';
 import 'transaction_history.dart';
 import 'loan_application_form.dart';
+import 'instant_loan_widget.dart';
+import 'instant_loan_status_tracker.dart';
+import 'otp_verification_dialog.dart';
 
 class CustomerAppLogic extends StatefulWidget {
   const CustomerAppLogic({
@@ -73,6 +76,17 @@ class _CustomerAppLogicState extends State<CustomerAppLogic> {
   int _unreadNotificationCount = 0;
   Map<String, dynamic>? _existingKycStatus;
 
+  // ── Upcoming Payments ────────────────────────────────────────────
+  Map<String, dynamic> _upcomingPayments = {};
+  Map<String, dynamic> _paymentHistoryData = {};
+  bool _isUpcomingLoading = false;
+  bool _isPaymentHistoryLoading = false;
+
+  // ── Instant Loan (Mkopo Chap Chap) ──────────────────────────────
+  Map<String, dynamic>? _prequalification;
+  String? _deviceId; // Device fingerprint ID (e.g. from platform_device_id)
+  String? _deviceDbId; // UUID from customer_devices table
+
   // ═══════════════════════════════════════════════════════════════════
   // LIFECYCLE
   // ═══════════════════════════════════════════════════════════════════
@@ -82,6 +96,7 @@ class _CustomerAppLogicState extends State<CustomerAppLogic> {
     super.initState();
     _service = CustomerGatewayService(client: widget.supabaseClient);
     _loadInitialData();
+    _registerDeviceOnStartup();
   }
 
   // ═══════════════════════════════════════════════════════════════════
@@ -106,6 +121,8 @@ class _CustomerAppLogicState extends State<CustomerAppLogic> {
         _service.getUnreadNotificationCount(),                   // 6
         _service.getKycStatus().catchError((_) => <String, dynamic>{}), // 7
         _service.getMyTransactions(limit: 5),                    // 8
+        _service.instantLoanPrequalify(deviceId: _deviceId).catchError((_) => <String, dynamic>{}), // 9
+        _service.getUpcomingPayments().catchError((_) => <String, dynamic>{}), // 10
       ]);
 
       if (!mounted) return;
@@ -119,6 +136,8 @@ class _CustomerAppLogicState extends State<CustomerAppLogic> {
       final unread = results[6] as int;
       final kyc = results[7] as Map<String, dynamic>;
       final txns = results[8] as List<Map<String, dynamic>>;
+      final prequal = results[9] as Map<String, dynamic>;
+      final upcoming = results[10] as Map<String, dynamic>;
 
       setState(() {
         _customerData = profile;
@@ -139,6 +158,11 @@ class _CustomerAppLogicState extends State<CustomerAppLogic> {
         _accountBalance = _dbl(profile['account_balance']);
         _loanBalance = _computeTotalOutstanding(loans);
         _savingsBalance = _computeTotalSavings(savings);
+        _prequalification = prequal.isNotEmpty ? prequal : null;
+        if (prequal['device_id'] != null) {
+          _deviceDbId = prequal['device_id'] as String;
+        }
+        _upcomingPayments = upcoming;
 
         _initialLoading = false;
       });
@@ -473,6 +497,156 @@ class _CustomerAppLogicState extends State<CustomerAppLogic> {
     }
   }
 
+  // ── Instant Loan (Mkopo Chap Chap) callbacks ─────────────────────
+
+  Future<void> _registerDeviceOnStartup() async {
+    // Generate a simple device ID from platform info
+    // In production, use platform_device_id or device_info_plus package
+    _deviceId = 'flutter_device_${DateTime.now().millisecondsSinceEpoch}';
+    try {
+      final result = await _service.registerDevice({
+        'device_id': _deviceId,
+        'platform': 'android', // Detect from Platform.isAndroid/isIOS
+        'device_name': 'Flutter App',
+        'app_version': '1.0.0',
+      });
+      if (mounted && result['id'] != null) {
+        setState(() => _deviceDbId = result['id'] as String);
+      }
+    } catch (_) {
+      // Non-critical — app works without device registration
+    }
+  }
+
+  void _handleInstantLoanApplyNow() {
+    if (_prequalification == null) return;
+
+    final product = _prequalification!['product'] as Map<String, dynamic>?;
+    if (product == null) return;
+
+    Navigator.of(context).push(MaterialPageRoute(
+      builder: (_) => Scaffold(
+        body: InstantLoanWidget(
+          prequalifiedAmount: _dbl(_prequalification!['max_amount']),
+          product: product,
+          creditScore: _dbl(_prequalification!['credit_score']),
+          customerPhone: _customerPhone,
+          deviceDbId: _deviceDbId,
+          onApply: (applicationData) async {
+            try {
+              final result = await _service.instantLoanApply(
+                requestedAmount: _dbl(applicationData['requested_amount']),
+                tenureMonths: (applicationData['tenure_months'] as num).toInt(),
+                purpose: applicationData['purpose'] as String?,
+                phoneNumber: _customerPhone,
+                deviceDbId: _deviceDbId,
+              );
+              if (mounted) {
+                Navigator.of(context).pop();
+                _showInstantLoanStatusTracker(result);
+              }
+            } catch (e) {
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('Error: ${_errorMsg(e)}')),
+                );
+              }
+            }
+          },
+          onCancel: () => Navigator.of(context).pop(),
+        ),
+      ),
+    ));
+  }
+
+  void _showInstantLoanStatusTracker(Map<String, dynamic> applyResult) {
+    final applicationId = applyResult['application_id'] as String? ?? '';
+    final decision = applyResult['decision'] as Map<String, dynamic>?;
+    final amount = _dbl(decision?['requested_amount'] ?? applyResult['requested_amount']);
+
+    Navigator.of(context).push(MaterialPageRoute(
+      builder: (_) => InstantLoanStatusTracker(
+        applicationId: applicationId,
+        requestedAmount: amount,
+        phoneNumber: _customerPhone,
+        initialDecision: decision,
+        onCheckStatus: (appId) => _service.instantLoanStatus(appId),
+        onRequestOtp: (appId) => _service.instantLoanRequestOtp(appId),
+        onVerifyOtp: (appId, code) => _service.instantLoanVerifyOtp(appId, code),
+        onComplete: (result) {
+          _refreshLoans();
+          if (mounted) {
+            Navigator.of(context).pop();
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Hongera! Mkopo wako umetumwa!')),
+            );
+          }
+        },
+        onClose: () => Navigator.of(context).pop(),
+      ),
+    ));
+  }
+
+  Future<void> _handleRefreshPrequalification() async {
+    try {
+      final prequal = await _service.instantLoanPrequalify(deviceId: _deviceId);
+      if (mounted) {
+        setState(() {
+          _prequalification = prequal.isNotEmpty ? prequal : null;
+          if (prequal['device_id'] != null) {
+            _deviceDbId = prequal['device_id'] as String;
+          }
+        });
+      }
+    } catch (_) {}
+  }
+
+  // ── Upcoming Payments & Payment History callbacks ────────────────
+
+  Future<void> _refreshUpcomingPayments() async {
+    setState(() => _isUpcomingLoading = true);
+    try {
+      final data = await _service.getUpcomingPayments();
+      if (mounted) {
+        setState(() {
+          _upcomingPayments = data;
+          _isUpcomingLoading = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => _isUpcomingLoading = false);
+    }
+  }
+
+  Future<void> _handleLoadPaymentHistory(String loanId,
+      {int limit = 20, int offset = 0}) async {
+    setState(() => _isPaymentHistoryLoading = true);
+    try {
+      final data = await _service.getPaymentHistory(
+        loanId: loanId,
+        limit: limit,
+        offset: offset,
+      );
+      if (mounted) {
+        setState(() {
+          _paymentHistoryData = data;
+          _isPaymentHistoryLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isPaymentHistoryLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: ${_errorMsg(e)}')),
+        );
+      }
+    }
+  }
+
+  void _handlePayNowFromReminder() {
+    // Navigate to M-Pesa payment — delegate to home screen overlay
+  }
+
   // ── Navigation callbacks ───────────────────────────────────────────
 
   void _handleViewAllTransactions() {
@@ -636,6 +810,17 @@ class _CustomerAppLogicState extends State<CustomerAppLogic> {
       onInitiatePayment: _handleInitiatePayment,
       onCheckPaymentStatus: _handleCheckPaymentStatus,
       onPaymentComplete: _handlePaymentComplete,
+      // ── Instant Loan callbacks ──
+      prequalification: _prequalification,
+      onInstantLoanApplyNow: _handleInstantLoanApplyNow,
+      onRefreshPrequalification: _handleRefreshPrequalification,
+      // ── Upcoming Payments callbacks ──
+      upcomingPayments: _upcomingPayments,
+      isUpcomingLoading: _isUpcomingLoading,
+      paymentHistoryData: _paymentHistoryData,
+      isPaymentHistoryLoading: _isPaymentHistoryLoading,
+      onRefreshUpcomingPayments: _refreshUpcomingPayments,
+      onLoadPaymentHistory: _handleLoadPaymentHistory,
       // ── Terminal callbacks ──
       onLogout: _handleLogout,
       onViewAllTransactions: _handleViewAllTransactions,

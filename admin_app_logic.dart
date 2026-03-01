@@ -89,6 +89,14 @@ class _AdminAppLogicState extends State<AdminAppLogic> {
   int _auditTotalCount = 0;
   bool _isAuditLoading = false;
 
+  // Collections
+  Map<String, dynamic> _collectionsDashboard = {};
+  List<Map<String, dynamic>> _collectionsQueue = [];
+  int _collectionsQueueTotal = 0;
+  bool _isCollectionsLoading = false;
+  String? _collectionsParFilter;
+  String? _collectionsStatusFilter;
+
   // ═══════════════════════════════════════════════════════════════════
   // LIFECYCLE
   // ═══════════════════════════════════════════════════════════════════
@@ -123,6 +131,8 @@ class _AdminAppLogicState extends State<AdminAppLogic> {
         futures.add(_loadLoanQueue());
         futures.add(_loadAuditLog());
         futures.add(_loadApprovedKycForOnboarding());
+        futures.add(_loadCollectionsDashboard());
+        futures.add(_loadCollectionsQueue());
       } else if (role == 'AUDITOR') {
         futures.add(_loadAuditLog());
       }
@@ -337,6 +347,63 @@ class _AdminAppLogicState extends State<AdminAppLogic> {
   }
 
   // ═══════════════════════════════════════════════════════════════════
+  // COLLECTIONS DATA LOADERS
+  // ═══════════════════════════════════════════════════════════════════
+
+  Future<void> _loadCollectionsDashboard() async {
+    if (mounted) setState(() => _isCollectionsLoading = true);
+    try {
+      final data = await _service.getCollectionsDashboard();
+      if (mounted) {
+        setState(() {
+          _collectionsDashboard = data;
+          _isCollectionsLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isCollectionsLoading = false);
+        _showError('Failed to load collections dashboard: $e');
+      }
+    }
+  }
+
+  Future<void> _loadCollectionsQueue({bool append = false}) async {
+    if (mounted) setState(() => _isCollectionsLoading = true);
+    try {
+      final data = await _service.getCollectionsQueue(
+        status: _collectionsStatusFilter,
+        parBucket: _collectionsParFilter,
+        limit: 20,
+        offset: append ? _collectionsQueue.length : 0,
+      );
+      if (mounted) {
+        setState(() {
+          final loans = (data['loans'] as List?)
+                  ?.map((e) => e is Map<String, dynamic>
+                      ? e
+                      : Map<String, dynamic>.from(e as Map))
+                  .toList() ??
+              [];
+          if (append) {
+            _collectionsQueue.addAll(loans);
+          } else {
+            _collectionsQueue = loans;
+          }
+          _collectionsQueueTotal =
+              (data['total_count'] as num?)?.toInt() ?? loans.length;
+          _isCollectionsLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isCollectionsLoading = false);
+        _showError('Failed to load collections queue: $e');
+      }
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════════════
   // CALLBACK IMPLEMENTATIONS
   // ═══════════════════════════════════════════════════════════════════
 
@@ -509,6 +576,59 @@ class _AdminAppLogicState extends State<AdminAppLogic> {
       _loadDashboard();
     } catch (e) {
       _showError('Failed to reject loan: $e');
+    }
+  }
+
+  // ── Collections ──
+
+  void _handleFilterCollectionsPar(String? parBucket) {
+    _collectionsParFilter = parBucket;
+    _loadCollectionsQueue();
+  }
+
+  void _handleFilterCollectionsStatus(String? status) {
+    _collectionsStatusFilter = status;
+    _loadCollectionsQueue();
+  }
+
+  void _handleLoadMoreCollections() {
+    _loadCollectionsQueue(append: true);
+  }
+
+  Future<void> _handleLogCollectionAction(Map<String, dynamic> data) async {
+    try {
+      await _service.logCollectionAction(
+        loanId: data['loan_id'] ?? '',
+        actionType: data['action_type'] ?? '',
+        notes: data['notes'],
+        outcome: data['outcome'] ?? 'N/A',
+        promiseDate: data['promise_date'],
+        promiseAmount: data['promise_amount'] != null
+            ? (data['promise_amount'] as num).toDouble()
+            : null,
+        nextActionDate: data['next_action_date'],
+        nextActionType: data['next_action_type'],
+      );
+      _showSuccess('Collection action logged');
+      _loadCollectionsDashboard();
+      _loadCollectionsQueue();
+    } catch (e) {
+      _showError('Failed to log collection action: $e');
+    }
+  }
+
+  Future<void> _handleWaivePenalty(Map<String, dynamic> data) async {
+    try {
+      await _service.waivePenalty(
+        loanId: data['loan_id'] ?? '',
+        amount: (data['amount'] as num).toDouble(),
+        reason: data['reason'] ?? '',
+      );
+      _showSuccess('Penalty waived successfully');
+      _loadCollectionsDashboard();
+      _loadCollectionsQueue();
+    } catch (e) {
+      _showError('Failed to waive penalty: $e');
     }
   }
 
@@ -724,6 +844,21 @@ class _AdminAppLogicState extends State<AdminAppLogic> {
       onRefreshAudit: () {
         _loadAuditLog(filters: _lastAuditFilters);
       },
+      // Collections
+      collectionsDashboard: _collectionsDashboard,
+      collectionsQueue: _collectionsQueue,
+      collectionsQueueTotal: _collectionsQueueTotal,
+      isCollectionsLoading: _isCollectionsLoading,
+      onRefreshCollections: () {
+        _loadCollectionsDashboard();
+        _loadCollectionsQueue();
+      },
+      onLoadCollectionsQueue: () => _loadCollectionsQueue(),
+      onFilterCollectionsPar: _handleFilterCollectionsPar,
+      onFilterCollectionsStatus: _handleFilterCollectionsStatus,
+      onLoadMoreCollections: _handleLoadMoreCollections,
+      onLogCollectionAction: _handleLogCollectionAction,
+      onWaivePenalty: _handleWaivePenalty,
       // Global
       onLogout: _handleLogout,
     );
