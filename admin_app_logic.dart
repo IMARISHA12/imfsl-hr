@@ -97,6 +97,31 @@ class _AdminAppLogicState extends State<AdminAppLogic> {
   String? _collectionsParFilter;
   String? _collectionsStatusFilter;
 
+  // Financial Reports
+  Map<String, dynamic> _reportData = {};
+  bool _isReportLoading = false;
+  String _currentReportType = 'loan_portfolio_report';
+
+  // Savings Management
+  Map<String, dynamic> _savingsData = {};
+  bool _isSavingsLoading = false;
+
+  // SMS Center
+  Map<String, dynamic> _smsData = {};
+  List<Map<String, dynamic>> _smsTemplates = [];
+  bool _isSmsLoading = false;
+
+  // Loan Restructuring / Write-Off
+  Map<String, dynamic> _restructureQueue = {};
+  bool _isRestructureLoading = false;
+
+  // Branch Performance
+  Map<String, dynamic> _branchDashboard = {};
+  Map<String, dynamic> _branchDetail = {};
+  Map<String, dynamic> _branchTrend = {};
+  String? _selectedBranch;
+  bool _isBranchLoading = false;
+
   // ═══════════════════════════════════════════════════════════════════
   // LIFECYCLE
   // ═══════════════════════════════════════════════════════════════════
@@ -125,7 +150,7 @@ class _AdminAppLogicState extends State<AdminAppLogic> {
       final futures = <Future>[_loadDashboard()];
 
       // Role-based parallel loading
-      if (role == 'ADMIN' || role == 'MANAGER' || role == 'OFFICER') {
+      if (role == 'ADMIN' || role == 'MANAGER') {
         futures.add(_loadStaffList());
         futures.add(_loadKycQueue());
         futures.add(_loadLoanQueue());
@@ -133,8 +158,26 @@ class _AdminAppLogicState extends State<AdminAppLogic> {
         futures.add(_loadApprovedKycForOnboarding());
         futures.add(_loadCollectionsDashboard());
         futures.add(_loadCollectionsQueue());
+        futures.add(_loadReportData());
+        futures.add(_loadSmsDashboard());
+        futures.add(_loadSmsTemplates());
+        futures.add(_loadRestructureQueue());
+        futures.add(_loadBranchDashboard());
+      } else if (role == 'OFFICER') {
+        futures.add(_loadStaffList());
+        futures.add(_loadKycQueue());
+        futures.add(_loadLoanQueue());
+        futures.add(_loadAuditLog());
+        futures.add(_loadApprovedKycForOnboarding());
+        futures.add(_loadCollectionsDashboard());
+        futures.add(_loadCollectionsQueue());
+        futures.add(_loadReportData());
+        futures.add(_loadRestructureQueue());
+        futures.add(_loadBranchDashboard());
       } else if (role == 'AUDITOR') {
         futures.add(_loadAuditLog());
+        futures.add(_loadReportData());
+        futures.add(_loadBranchDashboard());
       }
       // TELLER gets dashboard only
 
@@ -404,8 +447,281 @@ class _AdminAppLogicState extends State<AdminAppLogic> {
   }
 
   // ═══════════════════════════════════════════════════════════════════
+  // FINANCIAL REPORTS DATA LOADERS
+  // ═══════════════════════════════════════════════════════════════════
+
+  Future<void> _loadReportData({String? type, String? fromDate, String? toDate}) async {
+    if (mounted) setState(() => _isReportLoading = true);
+    final reportType = type ?? _currentReportType;
+    final now = DateTime.now();
+    final from = fromDate ?? DateTime(now.year, now.month, 1).toIso8601String().substring(0, 10);
+    final to = toDate ?? now.toIso8601String().substring(0, 10);
+    try {
+      Map<String, dynamic> data;
+      switch (reportType) {
+        case 'trial_balance':
+          data = await _service.getTrialBalance(to);
+          break;
+        case 'income_statement':
+          data = await _service.getIncomeStatement(fromDate: from, toDate: to);
+          break;
+        case 'balance_sheet':
+          data = await _service.getBalanceSheet(to);
+          break;
+        case 'loan_portfolio_report':
+          data = await _service.getLoanPortfolioReport(to);
+          break;
+        case 'cashflow_report':
+          data = await _service.getCashflowReport(fromDate: from, toDate: to);
+          break;
+        case 'par_aging_report':
+          data = await _service.getParAgingReport(to);
+          break;
+        default:
+          data = await _service.getLoanPortfolioReport(to);
+      }
+      if (mounted) {
+        setState(() {
+          _reportData = data;
+          _currentReportType = reportType;
+          _isReportLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isReportLoading = false);
+        _showError('Failed to load report: $e');
+      }
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════════════
+  // SMS DATA LOADERS
+  // ═══════════════════════════════════════════════════════════════════
+
+  Future<void> _loadSmsDashboard() async {
+    if (mounted) setState(() => _isSmsLoading = true);
+    try {
+      final data = await _service.getSmsDashboard();
+      if (mounted) {
+        setState(() {
+          _smsData = data;
+          _isSmsLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isSmsLoading = false);
+        _showError('Failed to load SMS dashboard: $e');
+      }
+    }
+  }
+
+  Future<void> _loadSmsTemplates() async {
+    try {
+      final data = await _service.getSmsTemplateList();
+      if (mounted) setState(() => _smsTemplates = data);
+    } catch (_) {}
+  }
+
+  // ═══════════════════════════════════════════════════════════════════
+  // RESTRUCTURE / WRITE-OFF DATA LOADERS
+  // ═══════════════════════════════════════════════════════════════════
+
+  Future<void> _loadRestructureQueue({String type = 'ALL', String status = 'ALL'}) async {
+    if (mounted) setState(() => _isRestructureLoading = true);
+    try {
+      final data = await _service.getRestructureWriteoffQueue(
+        type: type,
+        status: status,
+      );
+      if (mounted) {
+        setState(() {
+          _restructureQueue = data;
+          _isRestructureLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isRestructureLoading = false);
+        _showError('Failed to load restructure queue: $e');
+      }
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════════════
+  // BRANCH PERFORMANCE DATA LOADERS
+  // ═══════════════════════════════════════════════════════════════════
+
+  Future<void> _loadBranchDashboard() async {
+    if (mounted) setState(() => _isBranchLoading = true);
+    try {
+      final data = await _service.getBranchDashboard();
+      if (mounted) {
+        setState(() {
+          _branchDashboard = data;
+          _isBranchLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isBranchLoading = false);
+        _showError('Failed to load branch dashboard: $e');
+      }
+    }
+  }
+
+  Future<void> _loadBranchDetail(String branchId) async {
+    if (mounted) setState(() => _isBranchLoading = true);
+    final now = DateTime.now();
+    final from = DateTime(now.year, now.month, 1).toIso8601String().substring(0, 10);
+    final to = now.toIso8601String().substring(0, 10);
+    try {
+      final data = await _service.getBranchDetail(
+        branchId: branchId,
+        fromDate: from,
+        toDate: to,
+      );
+      if (mounted) {
+        setState(() {
+          _branchDetail = data;
+          _selectedBranch = branchId;
+          _isBranchLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isBranchLoading = false);
+        _showError('Failed to load branch detail: $e');
+      }
+    }
+  }
+
+  Future<void> _loadBranchTrend(String branchId) async {
+    try {
+      final data = await _service.getBranchTrend(branchId: branchId);
+      if (mounted) setState(() => _branchTrend = data);
+    } catch (_) {}
+  }
+
+  // ═══════════════════════════════════════════════════════════════════
   // CALLBACK IMPLEMENTATIONS
   // ═══════════════════════════════════════════════════════════════════
+
+  // ── Reports ──
+
+  void _handleLoadReport(String type, String fromDate, String toDate) {
+    _loadReportData(type: type, fromDate: fromDate, toDate: toDate);
+  }
+
+  // ── SMS ──
+
+  Future<void> _handleSendBulkSms(Map<String, dynamic> data) async {
+    try {
+      await _service.sendBulkSms(
+        templateCode: data['template_code'] ?? '',
+        customerIds: List<String>.from(data['customer_ids'] ?? []),
+        variables: data['variables'] != null
+            ? List<Map<String, dynamic>>.from(data['variables'])
+            : null,
+        language: data['language'] ?? 'sw',
+      );
+      _showSuccess('Bulk SMS sent successfully');
+      _loadSmsDashboard();
+    } catch (e) {
+      _showError('Failed to send bulk SMS: $e');
+    }
+  }
+
+  // ── Restructure / Write-Off ──
+
+  Future<void> _handleRequestRestructure(Map<String, dynamic> data) async {
+    try {
+      await _service.requestRestructure(
+        loanId: data['loan_id'] ?? '',
+        type: data['type'] ?? '',
+        newTerms: Map<String, dynamic>.from(data['new_terms'] ?? {}),
+        reason: data['reason'] ?? '',
+      );
+      _showSuccess('Restructure request submitted');
+      _loadRestructureQueue();
+    } catch (e) {
+      _showError('Failed to request restructure: $e');
+    }
+  }
+
+  Future<void> _handleApproveRestructure(String restructureId, String decision, {String? reason}) async {
+    try {
+      await _service.approveRestructure(
+        restructureId: restructureId,
+        decision: decision,
+        reason: reason,
+      );
+      _showSuccess('Restructure $decision');
+      _loadRestructureQueue();
+      _loadDashboard();
+    } catch (e) {
+      _showError('Failed to process restructure: $e');
+    }
+  }
+
+  Future<void> _handleRequestWriteoff(Map<String, dynamic> data) async {
+    try {
+      await _service.requestWriteoff(
+        loanId: data['loan_id'] ?? '',
+        reason: data['reason'] ?? '',
+      );
+      _showSuccess('Write-off request submitted');
+      _loadRestructureQueue();
+    } catch (e) {
+      _showError('Failed to request write-off: $e');
+    }
+  }
+
+  Future<void> _handleApproveWriteoff(String writeoffId, String decision, {String? reason}) async {
+    try {
+      await _service.approveWriteoff(
+        writeoffId: writeoffId,
+        decision: decision,
+        reason: reason,
+      );
+      _showSuccess('Write-off $decision');
+      _loadRestructureQueue();
+      _loadDashboard();
+    } catch (e) {
+      _showError('Failed to process write-off: $e');
+    }
+  }
+
+  Future<void> _handleRecordRecovery(Map<String, dynamic> data) async {
+    try {
+      await _service.recordRecovery(
+        writeoffId: data['writeoff_id'] ?? '',
+        amount: (data['amount'] as num).toDouble(),
+        reference: data['reference'] ?? '',
+      );
+      _showSuccess('Recovery recorded');
+      _loadRestructureQueue();
+    } catch (e) {
+      _showError('Failed to record recovery: $e');
+    }
+  }
+
+  // ── Branch ──
+
+  void _handleSelectBranch(String? branchId) {
+    if (branchId == null) {
+      setState(() {
+        _selectedBranch = null;
+        _branchDetail = {};
+        _branchTrend = {};
+      });
+      _loadBranchDashboard();
+    } else {
+      _loadBranchDetail(branchId);
+      _loadBranchTrend(branchId);
+    }
+  }
 
   // ── Staff ──
 
@@ -859,6 +1175,44 @@ class _AdminAppLogicState extends State<AdminAppLogic> {
       onLoadMoreCollections: _handleLoadMoreCollections,
       onLogCollectionAction: _handleLogCollectionAction,
       onWaivePenalty: _handleWaivePenalty,
+      // Financial Reports
+      reportData: _reportData,
+      isReportLoading: _isReportLoading,
+      currentReportType: _currentReportType,
+      onLoadReport: _handleLoadReport,
+      onRefreshReport: () => _loadReportData(),
+      // Savings Management
+      savingsData: _savingsData,
+      isSavingsLoading: _isSavingsLoading,
+      onRefreshSavings: () => _loadReportData(type: 'trial_balance'),
+      // SMS Center
+      smsData: _smsData,
+      smsTemplates: _smsTemplates,
+      isSmsLoading: _isSmsLoading,
+      onRefreshSms: () {
+        _loadSmsDashboard();
+        _loadSmsTemplates();
+      },
+      onSendBulkSms: _handleSendBulkSms,
+      // Restructuring / Write-Off
+      restructureQueue: _restructureQueue,
+      isRestructureLoading: _isRestructureLoading,
+      onRefreshRestructure: () => _loadRestructureQueue(),
+      onRequestRestructure: _handleRequestRestructure,
+      onApproveRestructure: _handleApproveRestructure,
+      onRequestWriteoff: _handleRequestWriteoff,
+      onApproveWriteoff: _handleApproveWriteoff,
+      onRecordRecovery: _handleRecordRecovery,
+      // Branch Performance
+      branchDashboard: _branchDashboard,
+      branchDetail: _branchDetail,
+      branchTrend: _branchTrend,
+      selectedBranch: _selectedBranch,
+      isBranchLoading: _isBranchLoading,
+      onSelectBranch: _handleSelectBranch,
+      onRefreshBranch: _loadBranchDashboard,
+      onLoadBranchDetail: _loadBranchDetail,
+      onLoadBranchTrend: _loadBranchTrend,
       // Global
       onLogout: _handleLogout,
     );

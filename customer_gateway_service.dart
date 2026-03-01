@@ -1,7 +1,7 @@
 // IMFSL Customer Gateway Service
 // ================================
 // Thin service layer that wraps all calls to the `imfsl-customer-gateway`
-// Supabase edge function. One method per action (30 actions + helpers).
+// Supabase edge function. One method per action (33 actions + helpers).
 //
 // Usage:
 //   final service = CustomerGatewayService(client: Supabase.instance.client);
@@ -397,6 +397,44 @@ class CustomerGatewayService {
       'offset': offset,
     });
     return _asMap(result);
+  }
+
+  // ═══════════════════════════════════════════════════════════════════
+  // SAVINGS SUMMARY
+  // ═══════════════════════════════════════════════════════════════════
+
+  /// Returns savings account summary with balances and accrued interest.
+  Future<Map<String, dynamic>> getSavingsSummary() async {
+    final result = await _call('savings_summary');
+    return _asMap(result);
+  }
+
+  // ═══════════════════════════════════════════════════════════════════
+  // SMS NOTIFICATION
+  // ═══════════════════════════════════════════════════════════════════
+
+  /// Sends a templated SMS notification (self-service).
+  Future<Map<String, dynamic>> sendSmsNotification({
+    required String templateCode,
+    Map<String, dynamic>? variables,
+    String language = 'sw',
+  }) async {
+    final result = await _call('send_sms_notification', {
+      'template_code': templateCode,
+      if (variables != null) 'variables': variables,
+      'language': language,
+    });
+    return _asMap(result);
+  }
+
+  // ═══════════════════════════════════════════════════════════════════
+  // RESTRUCTURE STATUS
+  // ═══════════════════════════════════════════════════════════════════
+
+  /// Returns the customer's loan restructure status/history.
+  Future<List<Map<String, dynamic>>> getMyRestructureStatus() async {
+    final result = await _call('my_restructure_status');
+    return _asList(result);
   }
 
   // ═══════════════════════════════════════════════════════════════════

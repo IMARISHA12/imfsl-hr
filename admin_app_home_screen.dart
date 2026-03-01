@@ -26,6 +26,11 @@ import 'imfsl_loan_approval_queue.dart';
 import 'imfsl_audit_log_viewer.dart';
 import 'imfsl_collections_dashboard.dart';
 import 'imfsl_collections_queue.dart';
+import 'imfsl_financial_reports.dart';
+import 'imfsl_savings_management.dart';
+import 'imfsl_sms_center.dart';
+import 'imfsl_loan_restructuring.dart';
+import 'imfsl_branch_performance.dart';
 
 /// Overlay screens that sit on top of the tab content.
 enum _OverlayScreen { none, staffOnboarding, staffProfile }
@@ -109,6 +114,41 @@ class AdminAppHomeScreen extends StatefulWidget {
     this.onLoadMoreCollections,
     this.onLogCollectionAction,
     this.onWaivePenalty,
+    // ── Financial Reports ──
+    this.reportData = const {},
+    this.isReportLoading = false,
+    this.currentReportType = 'loan_portfolio_report',
+    this.onLoadReport,
+    this.onRefreshReport,
+    // ── Savings Management ──
+    this.savingsData = const {},
+    this.isSavingsLoading = false,
+    this.onRefreshSavings,
+    // ── SMS Center ──
+    this.smsData = const {},
+    this.smsTemplates = const [],
+    this.isSmsLoading = false,
+    this.onRefreshSms,
+    this.onSendBulkSms,
+    // ── Restructuring / Write-Off ──
+    this.restructureQueue = const {},
+    this.isRestructureLoading = false,
+    this.onRefreshRestructure,
+    this.onRequestRestructure,
+    this.onApproveRestructure,
+    this.onRequestWriteoff,
+    this.onApproveWriteoff,
+    this.onRecordRecovery,
+    // ── Branch Performance ──
+    this.branchDashboard = const {},
+    this.branchDetail = const {},
+    this.branchTrend = const {},
+    this.selectedBranch,
+    this.isBranchLoading = false,
+    this.onSelectBranch,
+    this.onRefreshBranch,
+    this.onLoadBranchDetail,
+    this.onLoadBranchTrend,
     // ── Global ──
     this.onLogout,
   });
@@ -189,6 +229,46 @@ class AdminAppHomeScreen extends StatefulWidget {
   final Function(Map<String, dynamic>)? onLogCollectionAction;
   final Function(Map<String, dynamic>)? onWaivePenalty;
 
+  // ── Financial Reports ──
+  final Map<String, dynamic> reportData;
+  final bool isReportLoading;
+  final String currentReportType;
+  final Function(String type, String fromDate, String toDate)? onLoadReport;
+  final VoidCallback? onRefreshReport;
+
+  // ── Savings Management ──
+  final Map<String, dynamic> savingsData;
+  final bool isSavingsLoading;
+  final VoidCallback? onRefreshSavings;
+
+  // ── SMS Center ──
+  final Map<String, dynamic> smsData;
+  final List<Map<String, dynamic>> smsTemplates;
+  final bool isSmsLoading;
+  final VoidCallback? onRefreshSms;
+  final Function(Map<String, dynamic>)? onSendBulkSms;
+
+  // ── Restructuring / Write-Off ──
+  final Map<String, dynamic> restructureQueue;
+  final bool isRestructureLoading;
+  final VoidCallback? onRefreshRestructure;
+  final Function(Map<String, dynamic>)? onRequestRestructure;
+  final Function(String id, String decision, {String? reason})? onApproveRestructure;
+  final Function(Map<String, dynamic>)? onRequestWriteoff;
+  final Function(String id, String decision, {String? reason})? onApproveWriteoff;
+  final Function(Map<String, dynamic>)? onRecordRecovery;
+
+  // ── Branch Performance ──
+  final Map<String, dynamic> branchDashboard;
+  final Map<String, dynamic> branchDetail;
+  final Map<String, dynamic> branchTrend;
+  final String? selectedBranch;
+  final bool isBranchLoading;
+  final Function(String?)? onSelectBranch;
+  final VoidCallback? onRefreshBranch;
+  final Function(String)? onLoadBranchDetail;
+  final Function(String)? onLoadBranchTrend;
+
   // ── Global ──
   final VoidCallback? onLogout;
 
@@ -212,19 +292,23 @@ class _AdminAppHomeScreenState extends State<AdminAppHomeScreen> {
     switch (role) {
       case 'ADMIN':
       case 'MANAGER':
-        return _AdminTab.values; // All 6 tabs
+        return _AdminTab.values; // All 11 tabs
       case 'OFFICER':
         return [
           _AdminTab.dashboard,
-          _AdminTab.staff,
           _AdminTab.kyc,
           _AdminTab.loans,
           _AdminTab.collections,
+          _AdminTab.reports,
+          _AdminTab.restructure,
+          _AdminTab.branches,
           _AdminTab.audit,
         ];
       case 'AUDITOR':
         return [
           _AdminTab.dashboard,
+          _AdminTab.reports,
+          _AdminTab.branches,
           _AdminTab.audit,
         ];
       case 'TELLER':
@@ -233,6 +317,9 @@ class _AdminAppHomeScreenState extends State<AdminAppHomeScreen> {
         return [_AdminTab.dashboard];
     }
   }
+
+  /// Use NavigationDrawer when >5 tabs, BottomNav otherwise.
+  bool get _useDrawer => _visibleTabs.length > 5;
 
   bool get _canManageStaff {
     final role = widget.currentUserRole.toUpperCase();
@@ -284,6 +371,7 @@ class _AdminAppHomeScreenState extends State<AdminAppHomeScreen> {
       },
       child: Scaffold(
         appBar: _buildAppBar(tabs),
+        drawer: _useDrawer ? _buildDrawer(tabs) : null,
         body: Stack(
           children: [
             // ── Tab content ──
@@ -295,7 +383,7 @@ class _AdminAppHomeScreenState extends State<AdminAppHomeScreen> {
             if (_overlay != _OverlayScreen.none) _buildOverlay(),
           ],
         ),
-        bottomNavigationBar: tabs.length > 1
+        bottomNavigationBar: !_useDrawer && tabs.length > 1
             ? _buildBottomNav(tabs)
             : null,
       ),
@@ -334,7 +422,9 @@ class _AdminAppHomeScreenState extends State<AdminAppHomeScreen> {
               icon: const Icon(Icons.arrow_back),
               onPressed: _closeOverlay,
             )
-          : null,
+          : _useDrawer
+              ? null // Scaffold auto-shows hamburger icon for drawer
+              : null,
       title: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -416,7 +506,51 @@ class _AdminAppHomeScreenState extends State<AdminAppHomeScreen> {
   }
 
   // ═══════════════════════════════════════════════════════════════════
-  // BOTTOM NAV
+  // NAVIGATION DRAWER (for roles with >5 tabs)
+  // ═══════════════════════════════════════════════════════════════════
+
+  Widget _buildDrawer(List<_AdminTab> tabs) {
+    return NavigationDrawer(
+      selectedIndex: _currentTabIndex,
+      onDestinationSelected: (index) {
+        setState(() {
+          _currentTabIndex = index;
+          _overlay = _OverlayScreen.none;
+        });
+        Navigator.of(context).pop(); // close drawer
+      },
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(24, 24, 24, 16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                widget.staffName,
+                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                '${widget.staffEmail} \u2022 ${widget.currentUserRole}',
+                style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+              ),
+            ],
+          ),
+        ),
+        const Divider(indent: 16, endIndent: 16),
+        ...tabs.map((tab) {
+          return NavigationDrawerDestination(
+            icon: Icon(tab.icon),
+            selectedIcon: Icon(tab.activeIcon),
+            label: Text(tab.label),
+          );
+        }),
+      ],
+    );
+  }
+
+  // ═══════════════════════════════════════════════════════════════════
+  // BOTTOM NAV (for roles with <=5 tabs)
   // ═══════════════════════════════════════════════════════════════════
 
   Widget _buildBottomNav(List<_AdminTab> tabs) {
@@ -459,6 +593,16 @@ class _AdminAppHomeScreenState extends State<AdminAppHomeScreen> {
         return _buildLoanTab();
       case _AdminTab.collections:
         return _buildCollectionsTab();
+      case _AdminTab.reports:
+        return _buildReportsTab();
+      case _AdminTab.savings:
+        return _buildSavingsTab();
+      case _AdminTab.sms:
+        return _buildSmsTab();
+      case _AdminTab.restructure:
+        return _buildRestructureTab();
+      case _AdminTab.branches:
+        return _buildBranchesTab();
       case _AdminTab.audit:
         return _buildAuditTab();
     }
@@ -476,7 +620,7 @@ class _AdminAppHomeScreenState extends State<AdminAppHomeScreen> {
       onNavigateLoans: () => _switchToTab(_AdminTab.loans),
       onNavigateCollections: () => _switchToTab(_AdminTab.collections),
       onNavigateAudit: () => _switchToTab(_AdminTab.audit),
-      onNavigateReports: null, // No reports tab yet
+      onNavigateReports: () => _switchToTab(_AdminTab.reports),
     );
   }
 
@@ -597,6 +741,74 @@ class _AdminAppHomeScreenState extends State<AdminAppHomeScreen> {
     );
   }
 
+  // ── Reports Tab ──
+
+  Widget _buildReportsTab() {
+    return ImfslFinancialReports(
+      reportData: widget.reportData,
+      isLoading: widget.isReportLoading,
+      currentReport: widget.currentReportType,
+      onLoadReport: widget.onLoadReport,
+    );
+  }
+
+  // ── Savings Tab ──
+
+  Widget _buildSavingsTab() {
+    return ImfslSavingsManagement(
+      savingsData: widget.savingsData,
+      isLoading: widget.isSavingsLoading,
+      onRefresh: widget.onRefreshSavings,
+    );
+  }
+
+  // ── SMS Tab ──
+
+  Widget _buildSmsTab() {
+    return ImfslSmsCenter(
+      smsData: widget.smsData,
+      templates: widget.smsTemplates,
+      isLoading: widget.isSmsLoading,
+      onRefresh: widget.onRefreshSms,
+      onSendBulk: widget.onSendBulkSms,
+    );
+  }
+
+  // ── Restructure Tab ──
+
+  Widget _buildRestructureTab() {
+    return ImfslLoanRestructuring(
+      queueData: widget.restructureQueue,
+      isLoading: widget.isRestructureLoading,
+      onRefresh: widget.onRefreshRestructure,
+      onRequestRestructure: widget.onRequestRestructure,
+      onApproveRestructure: widget.onApproveRestructure,
+      onRejectRestructure: (id, {String? reason}) =>
+          widget.onApproveRestructure?.call(id, 'REJECTED', reason: reason),
+      onRequestWriteoff: widget.onRequestWriteoff,
+      onApproveWriteoff: widget.onApproveWriteoff,
+      onRejectWriteoff: (id, {String? reason}) =>
+          widget.onApproveWriteoff?.call(id, 'REJECTED', reason: reason),
+      onRecordRecovery: widget.onRecordRecovery,
+    );
+  }
+
+  // ── Branches Tab ──
+
+  Widget _buildBranchesTab() {
+    return ImfslBranchPerformance(
+      dashboardData: widget.branchDashboard,
+      branchDetail: widget.branchDetail,
+      trendData: widget.branchTrend,
+      isLoading: widget.isBranchLoading,
+      selectedBranch: widget.selectedBranch,
+      onSelectBranch: widget.onSelectBranch,
+      onRefresh: widget.onRefreshBranch,
+      onLoadDetail: widget.onLoadBranchDetail,
+      onLoadTrend: widget.onLoadBranchTrend,
+    );
+  }
+
   // ── Audit Tab ──
 
   Widget _buildAuditTab() {
@@ -672,6 +884,31 @@ enum _AdminTab {
     label: 'Collections',
     icon: Icons.account_balance_wallet_outlined,
     activeIcon: Icons.account_balance_wallet,
+  ),
+  reports(
+    label: 'Reports',
+    icon: Icons.bar_chart_outlined,
+    activeIcon: Icons.bar_chart,
+  ),
+  savings(
+    label: 'Savings',
+    icon: Icons.savings_outlined,
+    activeIcon: Icons.savings,
+  ),
+  sms(
+    label: 'SMS',
+    icon: Icons.sms_outlined,
+    activeIcon: Icons.sms,
+  ),
+  restructure(
+    label: 'Restructure',
+    icon: Icons.build_circle_outlined,
+    activeIcon: Icons.build_circle,
+  ),
+  branches(
+    label: 'Branches',
+    icon: Icons.account_tree_outlined,
+    activeIcon: Icons.account_tree,
   ),
   audit(
     label: 'Audit',

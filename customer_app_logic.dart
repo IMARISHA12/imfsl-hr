@@ -82,6 +82,9 @@ class _CustomerAppLogicState extends State<CustomerAppLogic> {
   bool _isUpcomingLoading = false;
   bool _isPaymentHistoryLoading = false;
 
+  // ── Savings Summary ────────────────────────────────────────────
+  Map<String, dynamic> _savingsSummary = {};
+
   // ── Instant Loan (Mkopo Chap Chap) ──────────────────────────────
   Map<String, dynamic>? _prequalification;
   String? _deviceId; // Device fingerprint ID (e.g. from platform_device_id)
@@ -123,6 +126,7 @@ class _CustomerAppLogicState extends State<CustomerAppLogic> {
         _service.getMyTransactions(limit: 5),                    // 8
         _service.instantLoanPrequalify(deviceId: _deviceId).catchError((_) => <String, dynamic>{}), // 9
         _service.getUpcomingPayments().catchError((_) => <String, dynamic>{}), // 10
+        _service.getSavingsSummary().catchError((_) => <String, dynamic>{}), // 11
       ]);
 
       if (!mounted) return;
@@ -138,6 +142,7 @@ class _CustomerAppLogicState extends State<CustomerAppLogic> {
       final txns = results[8] as List<Map<String, dynamic>>;
       final prequal = results[9] as Map<String, dynamic>;
       final upcoming = results[10] as Map<String, dynamic>;
+      final savSummary = results[11] as Map<String, dynamic>;
 
       setState(() {
         _customerData = profile;
@@ -163,6 +168,7 @@ class _CustomerAppLogicState extends State<CustomerAppLogic> {
           _deviceDbId = prequal['device_id'] as String;
         }
         _upcomingPayments = upcoming;
+        _savingsSummary = savSummary;
 
         _initialLoading = false;
       });
@@ -821,6 +827,8 @@ class _CustomerAppLogicState extends State<CustomerAppLogic> {
       isPaymentHistoryLoading: _isPaymentHistoryLoading,
       onRefreshUpcomingPayments: _refreshUpcomingPayments,
       onLoadPaymentHistory: _handleLoadPaymentHistory,
+      // ── Savings Summary ──
+      savingsSummary: _savingsSummary,
       // ── Terminal callbacks ──
       onLogout: _handleLogout,
       onViewAllTransactions: _handleViewAllTransactions,

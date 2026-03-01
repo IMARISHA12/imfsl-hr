@@ -1,7 +1,7 @@
 // IMFSL Admin Gateway Service
 // ============================
 // Typed wrapper for the `imfsl-admin-gateway` Supabase edge function.
-// 17 actions with RBAC (ADMIN, MANAGER, OFFICER, AUDITOR, TELLER).
+// 33 actions with RBAC (ADMIN, MANAGER, OFFICER, AUDITOR, TELLER).
 //
 // Usage:
 //   final service = AdminGatewayService(client: Supabase.instance.client);
@@ -335,6 +335,229 @@ class AdminGatewayService {
       'loan_id': loanId,
       'amount': amount,
       'reason': reason,
+    });
+    return _asMap(result);
+  }
+
+  // ═══════════════════════════════════════════════════════════════════
+  // FINANCIAL REPORTING
+  // ═══════════════════════════════════════════════════════════════════
+
+  /// Returns trial balance as of the given date.
+  Future<Map<String, dynamic>> getTrialBalance(String asOfDate) async {
+    final result = await _call('trial_balance', {'as_of_date': asOfDate});
+    return _asMap(result);
+  }
+
+  /// Returns income statement for a date range.
+  Future<Map<String, dynamic>> getIncomeStatement({
+    required String fromDate,
+    required String toDate,
+  }) async {
+    final result = await _call('income_statement', {
+      'from_date': fromDate,
+      'to_date': toDate,
+    });
+    return _asMap(result);
+  }
+
+  /// Returns balance sheet as of the given date.
+  Future<Map<String, dynamic>> getBalanceSheet(String asOfDate) async {
+    final result = await _call('balance_sheet', {'as_of_date': asOfDate});
+    return _asMap(result);
+  }
+
+  /// Returns loan portfolio report with PAR aging and product breakdown.
+  Future<Map<String, dynamic>> getLoanPortfolioReport(String asOfDate) async {
+    final result =
+        await _call('loan_portfolio_report', {'as_of_date': asOfDate});
+    return _asMap(result);
+  }
+
+  /// Returns cash flow report for a date range.
+  Future<Map<String, dynamic>> getCashflowReport({
+    required String fromDate,
+    required String toDate,
+  }) async {
+    final result = await _call('cashflow_report', {
+      'from_date': fromDate,
+      'to_date': toDate,
+    });
+    return _asMap(result);
+  }
+
+  /// Returns detailed PAR aging report as of the given date.
+  Future<Map<String, dynamic>> getParAgingReport(String asOfDate) async {
+    final result = await _call('par_aging_report', {'as_of_date': asOfDate});
+    return _asMap(result);
+  }
+
+  // ═══════════════════════════════════════════════════════════════════
+  // SMS / COMMUNICATION
+  // ═══════════════════════════════════════════════════════════════════
+
+  /// Returns SMS dashboard: summary, by category, queue status, recent.
+  Future<Map<String, dynamic>> getSmsDashboard() async {
+    final result = await _call('sms_dashboard');
+    return _asMap(result);
+  }
+
+  /// Returns all active SMS templates.
+  Future<List<Map<String, dynamic>>> getSmsTemplateList() async {
+    final result = await _call('sms_template_list');
+    return _asList(result);
+  }
+
+  /// Sends bulk SMS to multiple customers using a template.
+  Future<Map<String, dynamic>> sendBulkSms({
+    required String templateCode,
+    required List<String> customerIds,
+    List<Map<String, dynamic>>? variables,
+    String language = 'sw',
+  }) async {
+    final result = await _call('send_bulk_sms', {
+      'template_code': templateCode,
+      'customer_ids': customerIds,
+      if (variables != null) 'variables': variables,
+      'language': language,
+    });
+    return _asMap(result);
+  }
+
+  // ═══════════════════════════════════════════════════════════════════
+  // LOAN RESTRUCTURING & WRITE-OFF
+  // ═══════════════════════════════════════════════════════════════════
+
+  /// Returns combined restructure/write-off queue.
+  Future<Map<String, dynamic>> getRestructureWriteoffQueue({
+    String type = 'ALL',
+    String status = 'ALL',
+    int limit = 20,
+    int offset = 0,
+  }) async {
+    final result = await _call('restructure_writeoff_queue', {
+      'type': type,
+      'status': status,
+      'limit': limit,
+      'offset': offset,
+    });
+    return _asMap(result);
+  }
+
+  /// Requests a loan restructure. Returns the created request.
+  Future<Map<String, dynamic>> requestRestructure({
+    required String loanId,
+    required String type,
+    required Map<String, dynamic> newTerms,
+    required String reason,
+  }) async {
+    final result = await _call('request_restructure', {
+      'loan_id': loanId,
+      'type': type,
+      'new_terms': newTerms,
+      'reason': reason,
+    });
+    return _asMap(result);
+  }
+
+  /// Approves or rejects a restructure request.
+  Future<Map<String, dynamic>> approveRestructure({
+    required String restructureId,
+    required String decision,
+    String? reason,
+  }) async {
+    final result = await _call('approve_restructure', {
+      'restructure_id': restructureId,
+      'decision': decision,
+      if (reason != null) 'reason': reason,
+    });
+    return _asMap(result);
+  }
+
+  /// Requests a loan write-off. Returns the created request.
+  Future<Map<String, dynamic>> requestWriteoff({
+    required String loanId,
+    required String reason,
+  }) async {
+    final result = await _call('request_writeoff', {
+      'loan_id': loanId,
+      'reason': reason,
+    });
+    return _asMap(result);
+  }
+
+  /// Approves or rejects a write-off request. ADMIN only.
+  Future<Map<String, dynamic>> approveWriteoff({
+    required String writeoffId,
+    required String decision,
+    String? reason,
+  }) async {
+    final result = await _call('approve_writeoff', {
+      'writeoff_id': writeoffId,
+      'decision': decision,
+      if (reason != null) 'reason': reason,
+    });
+    return _asMap(result);
+  }
+
+  /// Records a recovery payment against a written-off loan.
+  Future<Map<String, dynamic>> recordRecovery({
+    required String writeoffId,
+    required double amount,
+    required String reference,
+  }) async {
+    final result = await _call('record_recovery', {
+      'writeoff_id': writeoffId,
+      'amount': amount,
+      'reference': reference,
+    });
+    return _asMap(result);
+  }
+
+  // ═══════════════════════════════════════════════════════════════════
+  // BRANCH PERFORMANCE
+  // ═══════════════════════════════════════════════════════════════════
+
+  /// Returns per-branch KPIs and aggregate totals.
+  Future<Map<String, dynamic>> getBranchDashboard() async {
+    final result = await _call('branch_dashboard');
+    return _asMap(result);
+  }
+
+  /// Returns side-by-side branch comparison for a date range.
+  Future<Map<String, dynamic>> getBranchComparison({
+    required String fromDate,
+    required String toDate,
+  }) async {
+    final result = await _call('branch_comparison', {
+      'from_date': fromDate,
+      'to_date': toDate,
+    });
+    return _asMap(result);
+  }
+
+  /// Returns deep-dive detail for a single branch.
+  Future<Map<String, dynamic>> getBranchDetail({
+    required String branchId,
+    required String fromDate,
+    required String toDate,
+  }) async {
+    final result = await _call('branch_detail', {
+      'branch_id': branchId,
+      'from_date': fromDate,
+      'to_date': toDate,
+    });
+    return _asMap(result);
+  }
+
+  /// Returns monthly trend data for a branch.
+  Future<Map<String, dynamic>> getBranchTrend({
+    required String branchId,
+    int months = 6,
+  }) async {
+    final result = await _call('branch_trend', {
+      'branch_id': branchId,
+      'months': months,
     });
     return _asMap(result);
   }
