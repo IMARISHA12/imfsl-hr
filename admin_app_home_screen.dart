@@ -17,13 +17,15 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
-// ─── Widget imports (all 6 admin widgets) ────────────────────────────
+// ─── Widget imports (all admin widgets) ──────────────────────────────
 import 'imfsl_admin_dashboard.dart';
 import 'imfsl_staff_management.dart';
 import 'imfsl_staff_onboarding_form.dart';
 import 'imfsl_kyc_review_queue.dart';
 import 'imfsl_loan_approval_queue.dart';
 import 'imfsl_audit_log_viewer.dart';
+import 'imfsl_collections_dashboard.dart';
+import 'imfsl_collections_queue.dart';
 
 /// Overlay screens that sit on top of the tab content.
 enum _OverlayScreen { none, staffOnboarding, staffProfile }
@@ -95,6 +97,18 @@ class AdminAppHomeScreen extends StatefulWidget {
     this.onSearchAudit,
     this.onLoadMoreAudit,
     this.onRefreshAudit,
+    // ── Collections ──
+    this.collectionsDashboard = const {},
+    this.collectionsQueue = const [],
+    this.collectionsQueueTotal = 0,
+    this.isCollectionsLoading = false,
+    this.onRefreshCollections,
+    this.onLoadCollectionsQueue,
+    this.onFilterCollectionsPar,
+    this.onFilterCollectionsStatus,
+    this.onLoadMoreCollections,
+    this.onLogCollectionAction,
+    this.onWaivePenalty,
     // ── Global ──
     this.onLogout,
   });
@@ -162,6 +176,19 @@ class AdminAppHomeScreen extends StatefulWidget {
   final VoidCallback? onLoadMoreAudit;
   final VoidCallback? onRefreshAudit;
 
+  // ── Collections ──
+  final Map<String, dynamic> collectionsDashboard;
+  final List<Map<String, dynamic>> collectionsQueue;
+  final int collectionsQueueTotal;
+  final bool isCollectionsLoading;
+  final VoidCallback? onRefreshCollections;
+  final VoidCallback? onLoadCollectionsQueue;
+  final Function(String?)? onFilterCollectionsPar;
+  final Function(String?)? onFilterCollectionsStatus;
+  final VoidCallback? onLoadMoreCollections;
+  final Function(Map<String, dynamic>)? onLogCollectionAction;
+  final Function(Map<String, dynamic>)? onWaivePenalty;
+
   // ── Global ──
   final VoidCallback? onLogout;
 
@@ -185,13 +212,14 @@ class _AdminAppHomeScreenState extends State<AdminAppHomeScreen> {
     switch (role) {
       case 'ADMIN':
       case 'MANAGER':
-        return _AdminTab.values; // All 5 tabs
+        return _AdminTab.values; // All 6 tabs
       case 'OFFICER':
         return [
           _AdminTab.dashboard,
           _AdminTab.staff,
           _AdminTab.kyc,
           _AdminTab.loans,
+          _AdminTab.collections,
           _AdminTab.audit,
         ];
       case 'AUDITOR':
@@ -429,6 +457,8 @@ class _AdminAppHomeScreenState extends State<AdminAppHomeScreen> {
         return _buildKycTab();
       case _AdminTab.loans:
         return _buildLoanTab();
+      case _AdminTab.collections:
+        return _buildCollectionsTab();
       case _AdminTab.audit:
         return _buildAuditTab();
     }
@@ -444,6 +474,7 @@ class _AdminAppHomeScreenState extends State<AdminAppHomeScreen> {
       onNavigateStaff: () => _switchToTab(_AdminTab.staff),
       onNavigateKyc: () => _switchToTab(_AdminTab.kyc),
       onNavigateLoans: () => _switchToTab(_AdminTab.loans),
+      onNavigateCollections: () => _switchToTab(_AdminTab.collections),
       onNavigateAudit: () => _switchToTab(_AdminTab.audit),
       onNavigateReports: null, // No reports tab yet
     );
@@ -503,6 +534,66 @@ class _AdminAppHomeScreenState extends State<AdminAppHomeScreen> {
       onApprove: widget.onApproveLoan,
       onReject: widget.onRejectLoan,
       onRefresh: widget.onRefreshLoans,
+    );
+  }
+
+  // ── Collections Tab ──
+
+  int _collectionsViewIndex = 0; // 0=Overview, 1=Queue
+
+  Widget _buildCollectionsTab() {
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+          child: Row(
+            children: [
+              Expanded(
+                child: SegmentedButton<int>(
+                  segments: const [
+                    ButtonSegment(value: 0, label: Text('Overview'), icon: Icon(Icons.dashboard_outlined, size: 18)),
+                    ButtonSegment(value: 1, label: Text('Queue'), icon: Icon(Icons.list_alt, size: 18)),
+                  ],
+                  selected: {_collectionsViewIndex},
+                  onSelectionChanged: (set) {
+                    setState(() => _collectionsViewIndex = set.first);
+                  },
+                  style: ButtonStyle(
+                    visualDensity: VisualDensity.compact,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        Expanded(
+          child: _collectionsViewIndex == 0
+              ? ImfslCollectionsDashboard(
+                  dashboardData: widget.collectionsDashboard,
+                  isLoading: widget.isCollectionsLoading,
+                  onRefresh: widget.onRefreshCollections,
+                  onLoanTap: (loanId) {
+                    // Switch to queue view filtered
+                    setState(() => _collectionsViewIndex = 1);
+                  },
+                  onLogAction: widget.onLogCollectionAction,
+                )
+              : ImfslCollectionsQueue(
+                  items: widget.collectionsQueue,
+                  totalCount: widget.collectionsQueueTotal,
+                  isLoading: widget.isCollectionsLoading,
+                  currentParFilter: null,
+                  currentStatusFilter: null,
+                  onFilterPar: widget.onFilterCollectionsPar,
+                  onFilterStatus: widget.onFilterCollectionsStatus,
+                  onLoadMore: widget.onLoadMoreCollections,
+                  onLogAction: widget.onLogCollectionAction,
+                  onWaivePenalty: widget.onWaivePenalty,
+                  onRefresh: widget.onRefreshCollections,
+                  currentUserRole: widget.currentUserRole,
+                ),
+        ),
+      ],
     );
   }
 
@@ -576,6 +667,11 @@ enum _AdminTab {
     label: 'Loans',
     icon: Icons.account_balance_outlined,
     activeIcon: Icons.account_balance,
+  ),
+  collections(
+    label: 'Collections',
+    icon: Icons.account_balance_wallet_outlined,
+    activeIcon: Icons.account_balance_wallet,
   ),
   audit(
     label: 'Audit',

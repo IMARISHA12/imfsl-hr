@@ -1,7 +1,7 @@
 // IMFSL Admin Gateway Service
 // ============================
 // Typed wrapper for the `imfsl-admin-gateway` Supabase edge function.
-// 13 actions with RBAC (ADMIN, MANAGER, OFFICER, AUDITOR, TELLER).
+// 17 actions with RBAC (ADMIN, MANAGER, OFFICER, AUDITOR, TELLER).
 //
 // Usage:
 //   final service = AdminGatewayService(client: Supabase.instance.client);
@@ -271,6 +271,72 @@ class AdminGatewayService {
       'offset': offset,
     });
     return _asList(result);
+  }
+
+  // ═══════════════════════════════════════════════════════════════════
+  // COLLECTIONS MANAGEMENT
+  // ═══════════════════════════════════════════════════════════════════
+
+  /// Returns collections dashboard: summary, PAR distribution, recent actions, top overdue.
+  Future<Map<String, dynamic>> getCollectionsDashboard() async {
+    final result = await _call('collections_dashboard');
+    return _asMap(result);
+  }
+
+  /// Returns filterable/paginated overdue loan queue for collections.
+  Future<Map<String, dynamic>> getCollectionsQueue({
+    String? status,
+    String? parBucket,
+    String? assignedTo,
+    int limit = 20,
+    int offset = 0,
+  }) async {
+    final result = await _call('collections_queue', {
+      if (status != null) 'status': status,
+      if (parBucket != null) 'par_bucket': parBucket,
+      if (assignedTo != null) 'assigned_to': assignedTo,
+      'limit': limit,
+      'offset': offset,
+    });
+    return _asMap(result);
+  }
+
+  /// Logs a collection action against a loan. Returns the created action.
+  Future<Map<String, dynamic>> logCollectionAction({
+    required String loanId,
+    required String actionType,
+    String? notes,
+    String outcome = 'N/A',
+    String? promiseDate,
+    double? promiseAmount,
+    String? nextActionDate,
+    String? nextActionType,
+  }) async {
+    final result = await _call('log_collection_action', {
+      'loan_id': loanId,
+      'action_type': actionType,
+      if (notes != null) 'notes': notes,
+      'outcome': outcome,
+      if (promiseDate != null) 'promise_date': promiseDate,
+      if (promiseAmount != null) 'promise_amount': promiseAmount,
+      if (nextActionDate != null) 'next_action_date': nextActionDate,
+      if (nextActionType != null) 'next_action_type': nextActionType,
+    });
+    return _asMap(result);
+  }
+
+  /// Waives penalty on a loan. ADMIN only. Creates reversal journal entry.
+  Future<Map<String, dynamic>> waivePenalty({
+    required String loanId,
+    required double amount,
+    required String reason,
+  }) async {
+    final result = await _call('waive_penalty', {
+      'loan_id': loanId,
+      'amount': amount,
+      'reason': reason,
+    });
+    return _asMap(result);
   }
 
   // ═══════════════════════════════════════════════════════════════════
