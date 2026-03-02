@@ -27,6 +27,10 @@ import 'loan_application_form.dart';
 import 'instant_loan_widget.dart';
 import 'instant_loan_status_tracker.dart';
 import 'otp_verification_dialog.dart';
+import 'kyc_onboarding.dart';
+import 'welcome_screen.dart';
+import 'imfsl_payment_center.dart';
+import 'mpesa_payment_widget.dart';
 
 class CustomerAppLogic extends StatefulWidget {
   const CustomerAppLogic({
@@ -85,6 +89,17 @@ class _CustomerAppLogicState extends State<CustomerAppLogic> {
   // ── Savings Summary ────────────────────────────────────────────
   Map<String, dynamic> _savingsSummary = {};
 
+  // ── Payment Center ────────────────────────────────────────────
+  Map<String, dynamic> _paymentCenterSummary = {};
+  List<Map<String, dynamic>> _paymentCenterRecentPayments = [];
+  int _paymentCenterRecentTotal = 0;
+  bool _isPaymentCenterLoading = false;
+  String _paymentCenterFilter = 'ALL';
+
+  // ── Onboarding state ──────────────────────────────────────────────
+  String _onboardingStatus = '';  // NEEDS_KYC, KYC_PENDING, KYC_UNDER_REVIEW, KYC_REJECTED, WELCOME, COMPLETE
+  Map<String, dynamic> _onboardingData = {};
+
   // ── Instant Loan (Mkopo Chap Chap) ──────────────────────────────
   Map<String, dynamic>? _prequalification;
   String? _deviceId; // Device fingerprint ID (e.g. from platform_device_id)
@@ -98,8 +113,86 @@ class _CustomerAppLogicState extends State<CustomerAppLogic> {
   void initState() {
     super.initState();
     _service = CustomerGatewayService(client: widget.supabaseClient);
-    _loadInitialData();
-    _registerDeviceOnStartup();
+    _checkOnboardingStatus();
+  }
+
+  // ═══════════════════════════════════════════════════════════════════
+  // ONBOARDING STATE MACHINE
+  // ═══════════════════════════════════════════════════════════════════
+
+  Future<void> _checkOnboardingStatus() async {
+    setState(() {
+      _initialLoading = true;
+      _loadError = null;
+    });
+
+    try {
+      // Opportunistic auth linking (silent — errors are fine)
+      try { await _service.linkAuth(); } catch (_) {}
+
+      final status = await _service.getOnboardingStatus();
+      if (!mounted) return;
+
+      final onboardingStatus = _str(status['status']);
+
+      setState(() {
+        _onboardingStatus = onboardingStatus;
+        _onboardingData = status;
+      });
+
+      if (onboardingStatus == 'COMPLETE') {
+        // Fully onboarded — load the full dashboard
+        _loadInitialData();
+        _registerDeviceOnStartup();
+      } else if (onboardingStatus == 'WELCOME') {
+        // Show welcome screen (customer exists but hasn't seen welcome)
+        setState(() => _initialLoading = false);
+      } else {
+        // KYC states — show appropriate screen
+        setState(() => _initialLoading = false);
+      }
+    } catch (e) {
+      if (!mounted) return;
+      // If onboarding check fails, fall back to full load
+      // (supports existing customers before onboarding flow was added)
+      _onboardingStatus = 'COMPLETE';
+      _loadInitialData();
+      _registerDeviceOnStartup();
+    }
+  }
+
+  void _handleWelcomeComplete() async {
+    try {
+      await _service.markWelcomeShown();
+    } catch (_) {
+      // Non-critical
+    }
+    if (mounted) {
+      setState(() {
+        _onboardingStatus = 'COMPLETE';
+        _initialLoading = true;
+      });
+      _loadInitialData();
+      _registerDeviceOnStartup();
+    }
+  }
+
+  Future<void> _refreshOnboardingStatus() async {
+    try {
+      final status = await _service.getOnboardingStatus();
+      if (mounted) {
+        setState(() {
+          _onboardingStatus = _str(status['status']);
+          _onboardingData = status;
+        });
+
+        if (_onboardingStatus == 'COMPLETE') {
+          setState(() => _initialLoading = true);
+          _loadInitialData();
+          _registerDeviceOnStartup();
+        }
+      }
+    } catch (_) {}
   }
 
   // ═══════════════════════════════════════════════════════════════════
@@ -127,6 +220,8 @@ class _CustomerAppLogicState extends State<CustomerAppLogic> {
         _service.instantLoanPrequalify(deviceId: _deviceId).catchError((_) => <String, dynamic>{}), // 9
         _service.getUpcomingPayments().catchError((_) => <String, dynamic>{}), // 10
         _service.getSavingsSummary().catchError((_) => <String, dynamic>{}), // 11
+        _service.getPaymentCenterSummary().catchError((_) => <String, dynamic>{}), // 12
+        _service.getRecentPayments().catchError((_) => <String, dynamic>{}), // 13
       ]);
 
       if (!mounted) return;
@@ -143,6 +238,8 @@ class _CustomerAppLogicState extends State<CustomerAppLogic> {
       final prequal = results[9] as Map<String, dynamic>;
       final upcoming = results[10] as Map<String, dynamic>;
       final savSummary = results[11] as Map<String, dynamic>;
+      final payCenterSummary = results[12] as Map<String, dynamic>;
+      final payCenterRecent = results[13] as Map<String, dynamic>;
 
       setState(() {
         _customerData = profile;
@@ -169,6 +266,14 @@ class _CustomerAppLogicState extends State<CustomerAppLogic> {
         }
         _upcomingPayments = upcoming;
         _savingsSummary = savSummary;
+        _paymentCenterSummary = payCenterSummary;
+        if (payCenterRecent.isNotEmpty) {
+          final items = payCenterRecent['items'];
+          _paymentCenterRecentPayments = items is List
+              ? items.map((e) => e is Map<String, dynamic> ? e : Map<String, dynamic>.from(e as Map)).toList()
+              : [];
+          _paymentCenterRecentTotal = (payCenterRecent['total_count'] as num?)?.toInt() ?? 0;
+        }
 
         _initialLoading = false;
       });
@@ -607,6 +712,160 @@ class _CustomerAppLogicState extends State<CustomerAppLogic> {
     } catch (_) {}
   }
 
+  // ── Payment Center callbacks ──────────────────────────────────────
+
+  Future<void> _loadPaymentCenterSummary() async {
+    setState(() => _isPaymentCenterLoading = true);
+    try {
+      final summary = await _service.getPaymentCenterSummary();
+      if (mounted) {
+        setState(() {
+          _paymentCenterSummary = summary;
+          _isPaymentCenterLoading = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => _isPaymentCenterLoading = false);
+    }
+  }
+
+  Future<void> _loadRecentPayments({bool append = false}) async {
+    try {
+      final purpose = _paymentCenterFilter == 'ALL' ? null : _paymentCenterFilter;
+      final offset = append ? _paymentCenterRecentPayments.length : 0;
+      final result = await _service.getRecentPayments(
+        limit: 20,
+        offset: offset,
+        purpose: purpose,
+      );
+      if (mounted) {
+        final items = result['items'];
+        final parsed = items is List
+            ? items.map((e) => e is Map<String, dynamic> ? e : Map<String, dynamic>.from(e as Map)).toList()
+            : <Map<String, dynamic>>[];
+        setState(() {
+          if (append) {
+            _paymentCenterRecentPayments = [..._paymentCenterRecentPayments, ...parsed];
+          } else {
+            _paymentCenterRecentPayments = parsed;
+          }
+          _paymentCenterRecentTotal = (result['total_count'] as num?)?.toInt() ?? 0;
+        });
+      }
+    } catch (_) {}
+  }
+
+  void _handlePaymentCenterRefresh() {
+    _loadPaymentCenterSummary();
+    _loadRecentPayments();
+  }
+
+  void _handlePaymentCenterFilterChange(String filter) {
+    setState(() => _paymentCenterFilter = filter);
+    _loadRecentPayments();
+  }
+
+  void _handlePaymentCenterLoadMore() {
+    _loadRecentPayments(append: true);
+  }
+
+  void _handlePaymentCenterPayLoan(Map<String, dynamic> loan) {
+    final loanId = loan['loan_id']?.toString() ?? '';
+    final nextDueAmount = _dbl(loan['next_due_amount']);
+    Navigator.of(context).push(MaterialPageRoute(
+      builder: (_) => Scaffold(
+        appBar: AppBar(
+          title: const Text('Pay Loan'),
+          backgroundColor: Colors.white,
+          foregroundColor: Colors.black87,
+          elevation: 0.5,
+        ),
+        body: MpesaPaymentWidget(
+          loans: _loans,
+          savingsAccounts: _savingsAccounts,
+          defaultPhoneNumber: _customerPhone,
+          preSelectedLoanId: loanId,
+          preFilledAmount: nextDueAmount > 0 ? nextDueAmount : null,
+          onInitiatePayment: _handleInitiatePayment,
+          onCheckPaymentStatus: _handleCheckPaymentStatus,
+          onSuccess: (result) {
+            Navigator.of(context).pop();
+            _handlePaymentComplete(result);
+            _handlePaymentCenterRefresh();
+          },
+          onCancel: () => Navigator.of(context).pop(),
+        ),
+      ),
+    ));
+  }
+
+  void _handlePaymentCenterDepositSavings(Map<String, dynamic> account) {
+    Navigator.of(context).push(MaterialPageRoute(
+      builder: (_) => Scaffold(
+        appBar: AppBar(
+          title: const Text('Deposit to Savings'),
+          backgroundColor: Colors.white,
+          foregroundColor: Colors.black87,
+          elevation: 0.5,
+        ),
+        body: MpesaPaymentWidget(
+          loans: _loans,
+          savingsAccounts: _savingsAccounts,
+          defaultPhoneNumber: _customerPhone,
+          onInitiatePayment: _handleInitiatePayment,
+          onCheckPaymentStatus: _handleCheckPaymentStatus,
+          onSuccess: (result) {
+            Navigator.of(context).pop();
+            _handlePaymentComplete(result);
+            _handlePaymentCenterRefresh();
+          },
+          onCancel: () => Navigator.of(context).pop(),
+        ),
+      ),
+    ));
+  }
+
+  void _handlePaymentCenterViewReceipt(String transactionId) async {
+    try {
+      final receipt = await _service.getFormattedReceipt(transactionId: transactionId);
+      if (mounted) {
+        ImfslPaymentCenter.showReceiptBottomSheet(context, receipt);
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error loading receipt: ${_errorMsg(e)}')),
+        );
+      }
+    }
+  }
+
+  void _handlePaymentCenterInitiatePayment() {
+    Navigator.of(context).push(MaterialPageRoute(
+      builder: (_) => Scaffold(
+        appBar: AppBar(
+          title: const Text('M-Pesa Payment'),
+          backgroundColor: Colors.white,
+          foregroundColor: Colors.black87,
+          elevation: 0.5,
+        ),
+        body: MpesaPaymentWidget(
+          loans: _loans,
+          savingsAccounts: _savingsAccounts,
+          defaultPhoneNumber: _customerPhone,
+          onInitiatePayment: _handleInitiatePayment,
+          onCheckPaymentStatus: _handleCheckPaymentStatus,
+          onSuccess: (result) {
+            Navigator.of(context).pop();
+            _handlePaymentComplete(result);
+            _handlePaymentCenterRefresh();
+          },
+          onCancel: () => Navigator.of(context).pop(),
+        ),
+      ),
+    ));
+  }
+
   // ── Upcoming Payments & Payment History callbacks ────────────────
 
   Future<void> _refreshUpcomingPayments() async {
@@ -763,6 +1022,26 @@ class _CustomerAppLogicState extends State<CustomerAppLogic> {
     if (_initialLoading) return _buildLoadingScreen();
     if (_loadError != null) return _buildErrorScreen();
 
+    // ── Onboarding routing ──
+    switch (_onboardingStatus) {
+      case 'NEEDS_KYC':
+        return _buildNeedsKycScreen();
+      case 'KYC_PENDING':
+      case 'KYC_UNDER_REVIEW':
+        return _buildKycPendingScreen();
+      case 'KYC_REJECTED':
+        return _buildKycRejectedScreen();
+      case 'KYC_APPROVED_NO_CUSTOMER':
+        return _buildKycPendingScreen(); // Edge case — approval happened but customer not yet created
+      case 'WELCOME':
+        return WelcomeScreen(
+          customerName: _str(_onboardingData['customer_name']),
+          accountNumber: _str(_onboardingData['account_number']),
+          onComplete: _handleWelcomeComplete,
+        );
+      // 'COMPLETE' or empty falls through to full dashboard
+    }
+
     return CustomerAppHomeScreen(
       // ── Identity ──
       customerName: _customerName,
@@ -827,11 +1106,192 @@ class _CustomerAppLogicState extends State<CustomerAppLogic> {
       isPaymentHistoryLoading: _isPaymentHistoryLoading,
       onRefreshUpcomingPayments: _refreshUpcomingPayments,
       onLoadPaymentHistory: _handleLoadPaymentHistory,
+      // ── Payment Center ──
+      paymentCenterSummary: _paymentCenterSummary,
+      paymentCenterRecentPayments: _paymentCenterRecentPayments,
+      paymentCenterRecentTotal: _paymentCenterRecentTotal,
+      isPaymentCenterLoading: _isPaymentCenterLoading,
+      paymentCenterFilter: _paymentCenterFilter,
+      onPaymentCenterFilterChange: _handlePaymentCenterFilterChange,
+      onPaymentCenterPayLoan: _handlePaymentCenterPayLoan,
+      onPaymentCenterDepositSavings: _handlePaymentCenterDepositSavings,
+      onPaymentCenterViewReceipt: _handlePaymentCenterViewReceipt,
+      onPaymentCenterRefresh: _handlePaymentCenterRefresh,
+      onPaymentCenterLoadMore: _handlePaymentCenterLoadMore,
+      onPaymentCenterInitiatePayment: _handlePaymentCenterInitiatePayment,
       // ── Savings Summary ──
       savingsSummary: _savingsSummary,
       // ── Terminal callbacks ──
       onLogout: _handleLogout,
       onViewAllTransactions: _handleViewAllTransactions,
+    );
+  }
+
+  // ═══════════════════════════════════════════════════════════════════
+  // ONBOARDING HELPER SCREENS
+  // ═══════════════════════════════════════════════════════════════════
+
+  Widget _buildNeedsKycScreen() {
+    return Scaffold(
+      body: KycOnboardingWidget(
+        onSubmitKyc: _handleSubmitKyc,
+        onCaptureSelfie: _handleCaptureSelfie,
+        onLivenessCheck: _handleLivenessCheck,
+        onCheckStatus: _handleCheckKycStatus,
+        onComplete: () {
+          _handleKycComplete();
+          _refreshOnboardingStatus();
+        },
+        existingStatus: _existingKycStatus,
+      ),
+    );
+  }
+
+  Widget _buildKycPendingScreen() {
+    final submittedAt = _str(_onboardingData['submitted_at']);
+    return Scaffold(
+      backgroundColor: Colors.grey[50],
+      body: SafeArea(
+        child: Center(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 32),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 80,
+                  height: 80,
+                  decoration: BoxDecoration(
+                    color: Colors.orange.shade50,
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Icon(Icons.hourglass_top, color: Colors.orange[600], size: 40),
+                ),
+                const SizedBox(height: 24),
+                const Text(
+                  'Application Under Review',
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  'Your KYC application has been submitted and is being reviewed by our team. '
+                  'We\'ll notify you once the review is complete.',
+                  style: TextStyle(fontSize: 14, color: Colors.grey[600], height: 1.5),
+                  textAlign: TextAlign.center,
+                ),
+                if (submittedAt.isNotEmpty) ...[
+                  const SizedBox(height: 12),
+                  Text(
+                    'Submitted: $submittedAt',
+                    style: TextStyle(fontSize: 12, color: Colors.grey[500]),
+                  ),
+                ],
+                const SizedBox(height: 28),
+                ElevatedButton.icon(
+                  onPressed: _refreshOnboardingStatus,
+                  icon: const Icon(Icons.refresh, size: 18),
+                  label: const Text('Check Status'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: _primaryColor,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 14),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextButton(
+                  onPressed: _handleLogout,
+                  child: Text('Log Out', style: TextStyle(color: Colors.grey[600])),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildKycRejectedScreen() {
+    final reason = _str(_onboardingData['rejection_reason']);
+    return Scaffold(
+      backgroundColor: Colors.grey[50],
+      body: SafeArea(
+        child: Center(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 32),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 80,
+                  height: 80,
+                  decoration: BoxDecoration(
+                    color: Colors.red.shade50,
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Icon(Icons.cancel_outlined, color: Colors.red[400], size: 40),
+                ),
+                const SizedBox(height: 24),
+                const Text(
+                  'KYC Application Rejected',
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  'Unfortunately, your application was not approved.',
+                  style: TextStyle(fontSize: 14, color: Colors.grey[600]),
+                  textAlign: TextAlign.center,
+                ),
+                if (reason.isNotEmpty) ...[
+                  const SizedBox(height: 16),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: Colors.red.shade50,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: Colors.red.shade200),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Reason:',
+                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.red[700]),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          reason,
+                          style: TextStyle(fontSize: 13, color: Colors.red[800], height: 1.4),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 28),
+                ElevatedButton.icon(
+                  onPressed: () {
+                    setState(() => _onboardingStatus = 'NEEDS_KYC');
+                  },
+                  icon: const Icon(Icons.replay, size: 18),
+                  label: const Text('Resubmit KYC'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: _primaryColor,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 14),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextButton(
+                  onPressed: _handleLogout,
+                  child: Text('Log Out', style: TextStyle(color: Colors.grey[600])),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 

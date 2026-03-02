@@ -1,7 +1,8 @@
 // IMFSL Admin Portal Home Screen
 // ================================
-// Navigation shell that integrates all 6 admin widgets with RBAC-based
+// Navigation shell that integrates admin widgets with RBAC-based
 // tab visibility. Roles: ADMIN, MANAGER, OFFICER, AUDITOR, TELLER.
+// 14 tabs (ADMIN/MANAGER), 11 (OFFICER), 4 (AUDITOR), 1 (TELLER).
 //
 // Usage:
 //   AdminAppHomeScreen(
@@ -31,9 +32,19 @@ import 'imfsl_savings_management.dart';
 import 'imfsl_sms_center.dart';
 import 'imfsl_loan_restructuring.dart';
 import 'imfsl_branch_performance.dart';
+import 'imfsl_mpesa_reconciliation.dart';
+import 'imfsl_approval_workflow.dart';
+import 'imfsl_executive_console.dart';
+import 'imfsl_loan_operations_console.dart';
+import 'imfsl_payment_mpesa_console.dart';
+import 'imfsl_risk_compliance_console.dart';
+import 'imfsl_customer_360_console.dart';
 
 /// Overlay screens that sit on top of the tab content.
 enum _OverlayScreen { none, staffOnboarding, staffProfile }
+
+/// Sub-console views within the Ops Console tab.
+enum _OpsConsoleView { executive, loanOps, payments, risk, customer360 }
 
 class AdminAppHomeScreen extends StatefulWidget {
   const AdminAppHomeScreen({
@@ -149,6 +160,105 @@ class AdminAppHomeScreen extends StatefulWidget {
     this.onRefreshBranch,
     this.onLoadBranchDetail,
     this.onLoadBranchTrend,
+    // ── M-Pesa Reconciliation ──
+    this.onGetMpesaDashboard,
+    this.onMpesaManualReconcile,
+    this.onMpesaSearch,
+    // ── Approval Workflow ──
+    this.pendingApprovals = const [],
+    this.pendingApprovalsTotal = 0,
+    this.approvalRules = const [],
+    this.isApprovalsLoading = false,
+    this.approvalsFilter = 'ALL',
+    this.onApprovalsFilterChange,
+    this.onProcessApproval,
+    this.onViewApprovalChain,
+    this.onRefreshApprovals,
+    this.onLoadMoreApprovals,
+    this.onManageApprovalRules,
+    // ── Ops Console ──
+    this.executiveKpis = const {},
+    this.topPortfolio = const [],
+    this.recentMpesa = const [],
+    this.isOpsConsoleLoading = false,
+    this.onRefreshOpsConsole,
+    // Ops Console — Loan Operations
+    this.opsPipelineData = const [],
+    this.opsPortfolioData = const [],
+    this.opsRepaymentData = const [],
+    this.isOpsPipelineLoading = false,
+    this.isOpsPortfolioLoading = false,
+    this.isOpsRepaymentLoading = false,
+    this.onRefreshOpsPipeline,
+    this.onRefreshOpsPortfolio,
+    this.onRefreshOpsRepayment,
+    this.onLoadMoreOpsPipeline,
+    this.onLoadMoreOpsPortfolio,
+    this.onLoadMoreOpsRepayment,
+    this.onOpsPipelineStatusFilter,
+    this.onOpsPortfolioStatusFilter,
+    this.onOpsPortfolioParFilter,
+    this.onOpsRepaymentStatusFilter,
+    this.onOpsRepaymentDateRange,
+    // Ops Console — Payments & M-Pesa
+    this.opsMpesaData = const [],
+    this.opsDisbursementData = const [],
+    this.opsMpesaKpis = const {},
+    this.isOpsMpesaLoading = false,
+    this.isOpsDisbursementLoading = false,
+    this.onRefreshOpsMpesa,
+    this.onRefreshOpsDisbursements,
+    this.onLoadMoreOpsMpesa,
+    this.onLoadMoreOpsDisbursements,
+    this.onOpsMpesaStatusFilter,
+    this.onOpsMpesaPurposeFilter,
+    this.onOpsMpesaDateRange,
+    this.onOpsDisbursementStatusFilter,
+    // Ops Console — Risk & Compliance
+    this.opsCollectionsData = const [],
+    this.opsRestructureData = const [],
+    this.opsInstantLoanData = const [],
+    this.opsApprovalsData = const [],
+    this.isOpsCollectionsLoading = false,
+    this.isOpsRestructureLoading = false,
+    this.isOpsInstantLoanLoading = false,
+    this.isOpsApprovalsLoading = false,
+    this.onRefreshOpsCollections,
+    this.onRefreshOpsRestructure,
+    this.onRefreshOpsInstantLoans,
+    this.onRefreshOpsApprovals,
+    this.onLoadMoreOpsCollections,
+    this.onLoadMoreOpsRestructure,
+    this.onLoadMoreOpsInstantLoans,
+    this.onLoadMoreOpsApprovals,
+    this.onOpsCollectionsParFilter,
+    this.onOpsCollectionsPriorityFilter,
+    this.onOpsRestructureTypeFilter,
+    this.onOpsRestructureStatusFilter,
+    this.onOpsInstantLoanDecisionFilter,
+    this.onOpsApprovalsStatusFilter,
+    this.onOpsApprovalsEntityTypeFilter,
+    // Ops Console — Customer 360
+    this.opsDirectoryData = const [],
+    this.opsKycData = const [],
+    this.opsSavingsData = const [],
+    this.opsGuarantorData = const [],
+    this.isOpsDirectoryLoading = false,
+    this.isOpsKycLoading = false,
+    this.isOpsSavingsLoading = false,
+    this.isOpsGuarantorLoading = false,
+    this.onRefreshOpsDirectory,
+    this.onRefreshOpsKyc,
+    this.onRefreshOpsSavings,
+    this.onRefreshOpsGuarantors,
+    this.onLoadMoreOpsDirectory,
+    this.onLoadMoreOpsKyc,
+    this.onLoadMoreOpsSavings,
+    this.onLoadMoreOpsGuarantors,
+    this.onOpsDirectorySearch,
+    this.onOpsKycStatusFilter,
+    this.onOpsSavingsStatusFilter,
+    this.onOpsGuarantorStatusFilter,
     // ── Global ──
     this.onLogout,
   });
@@ -269,6 +379,124 @@ class AdminAppHomeScreen extends StatefulWidget {
   final Function(String)? onLoadBranchDetail;
   final Function(String)? onLoadBranchTrend;
 
+  // ── M-Pesa Reconciliation ──
+  final Future<Map<String, dynamic>> Function({
+    String? status,
+    String? fromDate,
+    String? toDate,
+    int limit,
+    int offset,
+  })? onGetMpesaDashboard;
+  final Future<Map<String, dynamic>> Function({
+    required String transactionId,
+    required String appliedToType,
+    required String appliedToId,
+  })? onMpesaManualReconcile;
+  final Future<List<Map<String, dynamic>>> Function(String query)?
+      onMpesaSearch;
+
+  // ── Approval Workflow ──
+  final List<Map<String, dynamic>> pendingApprovals;
+  final int pendingApprovalsTotal;
+  final List<Map<String, dynamic>> approvalRules;
+  final bool isApprovalsLoading;
+  final String approvalsFilter;
+  final Function(String)? onApprovalsFilterChange;
+  final Function(Map<String, dynamic>)? onProcessApproval;
+  final Function(String entityType, String entityId)? onViewApprovalChain;
+  final VoidCallback? onRefreshApprovals;
+  final VoidCallback? onLoadMoreApprovals;
+  final Function({required String operation, Map<String, dynamic> ruleData})?
+      onManageApprovalRules;
+
+  // ── Ops Console — Executive ──
+  final Map<String, dynamic> executiveKpis;
+  final List<Map<String, dynamic>> topPortfolio;
+  final List<Map<String, dynamic>> recentMpesa;
+  final bool isOpsConsoleLoading;
+  final VoidCallback? onRefreshOpsConsole;
+
+  // ── Ops Console — Loan Operations ──
+  final List<Map<String, dynamic>> opsPipelineData;
+  final List<Map<String, dynamic>> opsPortfolioData;
+  final List<Map<String, dynamic>> opsRepaymentData;
+  final bool isOpsPipelineLoading;
+  final bool isOpsPortfolioLoading;
+  final bool isOpsRepaymentLoading;
+  final VoidCallback? onRefreshOpsPipeline;
+  final VoidCallback? onRefreshOpsPortfolio;
+  final VoidCallback? onRefreshOpsRepayment;
+  final VoidCallback? onLoadMoreOpsPipeline;
+  final VoidCallback? onLoadMoreOpsPortfolio;
+  final VoidCallback? onLoadMoreOpsRepayment;
+  final Function(String?)? onOpsPipelineStatusFilter;
+  final Function(String?)? onOpsPortfolioStatusFilter;
+  final Function(String?)? onOpsPortfolioParFilter;
+  final Function(String?)? onOpsRepaymentStatusFilter;
+  final Function(String? from, String? to)? onOpsRepaymentDateRange;
+
+  // ── Ops Console — Payments & M-Pesa ──
+  final List<Map<String, dynamic>> opsMpesaData;
+  final List<Map<String, dynamic>> opsDisbursementData;
+  final Map<String, dynamic> opsMpesaKpis;
+  final bool isOpsMpesaLoading;
+  final bool isOpsDisbursementLoading;
+  final VoidCallback? onRefreshOpsMpesa;
+  final VoidCallback? onRefreshOpsDisbursements;
+  final VoidCallback? onLoadMoreOpsMpesa;
+  final VoidCallback? onLoadMoreOpsDisbursements;
+  final Function(String?)? onOpsMpesaStatusFilter;
+  final Function(String?)? onOpsMpesaPurposeFilter;
+  final Function(String? from, String? to)? onOpsMpesaDateRange;
+  final Function(String?)? onOpsDisbursementStatusFilter;
+
+  // ── Ops Console — Risk & Compliance ──
+  final List<Map<String, dynamic>> opsCollectionsData;
+  final List<Map<String, dynamic>> opsRestructureData;
+  final List<Map<String, dynamic>> opsInstantLoanData;
+  final List<Map<String, dynamic>> opsApprovalsData;
+  final bool isOpsCollectionsLoading;
+  final bool isOpsRestructureLoading;
+  final bool isOpsInstantLoanLoading;
+  final bool isOpsApprovalsLoading;
+  final VoidCallback? onRefreshOpsCollections;
+  final VoidCallback? onRefreshOpsRestructure;
+  final VoidCallback? onRefreshOpsInstantLoans;
+  final VoidCallback? onRefreshOpsApprovals;
+  final VoidCallback? onLoadMoreOpsCollections;
+  final VoidCallback? onLoadMoreOpsRestructure;
+  final VoidCallback? onLoadMoreOpsInstantLoans;
+  final VoidCallback? onLoadMoreOpsApprovals;
+  final Function(String?)? onOpsCollectionsParFilter;
+  final Function(String?)? onOpsCollectionsPriorityFilter;
+  final Function(String?)? onOpsRestructureTypeFilter;
+  final Function(String?)? onOpsRestructureStatusFilter;
+  final Function(String?)? onOpsInstantLoanDecisionFilter;
+  final Function(String?)? onOpsApprovalsStatusFilter;
+  final Function(String?)? onOpsApprovalsEntityTypeFilter;
+
+  // ── Ops Console — Customer 360 ──
+  final List<Map<String, dynamic>> opsDirectoryData;
+  final List<Map<String, dynamic>> opsKycData;
+  final List<Map<String, dynamic>> opsSavingsData;
+  final List<Map<String, dynamic>> opsGuarantorData;
+  final bool isOpsDirectoryLoading;
+  final bool isOpsKycLoading;
+  final bool isOpsSavingsLoading;
+  final bool isOpsGuarantorLoading;
+  final VoidCallback? onRefreshOpsDirectory;
+  final VoidCallback? onRefreshOpsKyc;
+  final VoidCallback? onRefreshOpsSavings;
+  final VoidCallback? onRefreshOpsGuarantors;
+  final VoidCallback? onLoadMoreOpsDirectory;
+  final VoidCallback? onLoadMoreOpsKyc;
+  final VoidCallback? onLoadMoreOpsSavings;
+  final VoidCallback? onLoadMoreOpsGuarantors;
+  final Function(String)? onOpsDirectorySearch;
+  final Function(String?)? onOpsKycStatusFilter;
+  final Function(String?)? onOpsSavingsStatusFilter;
+  final Function(String?)? onOpsGuarantorStatusFilter;
+
   // ── Global ──
   final VoidCallback? onLogout;
 
@@ -281,6 +509,7 @@ class _AdminAppHomeScreenState extends State<AdminAppHomeScreen> {
 
   int _currentTabIndex = 0;
   _OverlayScreen _overlay = _OverlayScreen.none;
+  _OpsConsoleView _opsConsoleView = _OpsConsoleView.executive;
 
   // ═══════════════════════════════════════════════════════════════════
   // RBAC TAB CONFIGURATION
@@ -292,17 +521,20 @@ class _AdminAppHomeScreenState extends State<AdminAppHomeScreen> {
     switch (role) {
       case 'ADMIN':
       case 'MANAGER':
-        return _AdminTab.values; // All 11 tabs
+        return _AdminTab.values; // All 14 tabs
       case 'OFFICER':
         return [
           _AdminTab.dashboard,
           _AdminTab.kyc,
           _AdminTab.loans,
+          _AdminTab.approvals,
           _AdminTab.collections,
           _AdminTab.reports,
           _AdminTab.restructure,
           _AdminTab.branches,
+          _AdminTab.mpesa,
           _AdminTab.audit,
+          _AdminTab.opsConsole,
         ];
       case 'AUDITOR':
         return [
@@ -363,10 +595,17 @@ class _AdminAppHomeScreenState extends State<AdminAppHomeScreen> {
     }
 
     return PopScope(
-      canPop: _overlay == _OverlayScreen.none,
+      canPop: _overlay == _OverlayScreen.none &&
+          !(_visibleTabs[_currentTabIndex] == _AdminTab.opsConsole &&
+              _opsConsoleView != _OpsConsoleView.executive),
       onPopInvokedWithResult: (didPop, _) {
-        if (!didPop && _overlay != _OverlayScreen.none) {
-          _closeOverlay();
+        if (!didPop) {
+          if (_overlay != _OverlayScreen.none) {
+            _closeOverlay();
+          } else if (_visibleTabs[_currentTabIndex] == _AdminTab.opsConsole &&
+              _opsConsoleView != _OpsConsoleView.executive) {
+            setState(() => _opsConsoleView = _OpsConsoleView.executive);
+          }
         }
       },
       child: Scaffold(
@@ -591,6 +830,8 @@ class _AdminAppHomeScreenState extends State<AdminAppHomeScreen> {
         return _buildKycTab();
       case _AdminTab.loans:
         return _buildLoanTab();
+      case _AdminTab.approvals:
+        return _buildApprovalsTab();
       case _AdminTab.collections:
         return _buildCollectionsTab();
       case _AdminTab.reports:
@@ -603,8 +844,12 @@ class _AdminAppHomeScreenState extends State<AdminAppHomeScreen> {
         return _buildRestructureTab();
       case _AdminTab.branches:
         return _buildBranchesTab();
+      case _AdminTab.mpesa:
+        return _buildMpesaTab();
       case _AdminTab.audit:
         return _buildAuditTab();
+      case _AdminTab.opsConsole:
+        return _buildOpsConsoleTab();
     }
   }
 
@@ -809,6 +1054,35 @@ class _AdminAppHomeScreenState extends State<AdminAppHomeScreen> {
     );
   }
 
+  // ── Approvals Tab ──
+
+  Widget _buildApprovalsTab() {
+    return ImfslApprovalWorkflow(
+      pendingApprovals: widget.pendingApprovals,
+      pendingTotalCount: widget.pendingApprovalsTotal,
+      approvalRules: widget.approvalRules,
+      isLoading: widget.isApprovalsLoading,
+      currentUserRole: widget.currentUserRole,
+      currentFilter: widget.approvalsFilter,
+      onFilterChange: widget.onApprovalsFilterChange,
+      onProcessApproval: widget.onProcessApproval,
+      onViewChain: widget.onViewApprovalChain,
+      onRefresh: widget.onRefreshApprovals,
+      onLoadMore: widget.onLoadMoreApprovals,
+      onManageRules: widget.onManageApprovalRules,
+    );
+  }
+
+  // ── M-Pesa Tab ──
+
+  Widget _buildMpesaTab() {
+    return ImfslMpesaReconciliation(
+      onGetDashboard: widget.onGetMpesaDashboard,
+      onManualReconcile: widget.onMpesaManualReconcile,
+      onSearch: widget.onMpesaSearch,
+    );
+  }
+
   // ── Audit Tab ──
 
   Widget _buildAuditTab() {
@@ -821,6 +1095,132 @@ class _AdminAppHomeScreenState extends State<AdminAppHomeScreen> {
       onLoadMore: widget.onLoadMoreAudit,
       onRefresh: widget.onRefreshAudit,
     );
+  }
+
+  // ── Ops Console Tab ──
+
+  void _navigateOpsConsole(String consoleName) {
+    setState(() {
+      switch (consoleName) {
+        case 'loanOps':
+          _opsConsoleView = _OpsConsoleView.loanOps;
+          break;
+        case 'payments':
+          _opsConsoleView = _OpsConsoleView.payments;
+          break;
+        case 'risk':
+          _opsConsoleView = _OpsConsoleView.risk;
+          break;
+        case 'customer360':
+          _opsConsoleView = _OpsConsoleView.customer360;
+          break;
+        default:
+          _opsConsoleView = _OpsConsoleView.executive;
+      }
+    });
+  }
+
+  Widget _buildOpsConsoleTab() {
+    switch (_opsConsoleView) {
+      case _OpsConsoleView.executive:
+        return ImfslExecutiveConsole(
+          executiveKpis: widget.executiveKpis,
+          topPortfolio: widget.topPortfolio,
+          recentMpesa: widget.recentMpesa,
+          isLoading: widget.isOpsConsoleLoading,
+          onRefresh: widget.onRefreshOpsConsole,
+          onNavigate: _navigateOpsConsole,
+        );
+      case _OpsConsoleView.loanOps:
+        return ImfslLoanOperationsConsole(
+          pipelineData: widget.opsPipelineData,
+          portfolioData: widget.opsPortfolioData,
+          repaymentData: widget.opsRepaymentData,
+          isPipelineLoading: widget.isOpsPipelineLoading,
+          isPortfolioLoading: widget.isOpsPortfolioLoading,
+          isRepaymentLoading: widget.isOpsRepaymentLoading,
+          onPipelineStatusFilter: widget.onOpsPipelineStatusFilter,
+          onPortfolioStatusFilter: widget.onOpsPortfolioStatusFilter,
+          onPortfolioParFilter: widget.onOpsPortfolioParFilter,
+          onRepaymentStatusFilter: widget.onOpsRepaymentStatusFilter,
+          onRepaymentDateRange: widget.onOpsRepaymentDateRange,
+          onLoadMorePipeline: widget.onLoadMoreOpsPipeline,
+          onLoadMorePortfolio: widget.onLoadMoreOpsPortfolio,
+          onLoadMoreRepayment: widget.onLoadMoreOpsRepayment,
+          onRefreshPipeline: widget.onRefreshOpsPipeline,
+          onRefreshPortfolio: widget.onRefreshOpsPortfolio,
+          onRefreshRepayment: widget.onRefreshOpsRepayment,
+          onBack: () => setState(() => _opsConsoleView = _OpsConsoleView.executive),
+        );
+      case _OpsConsoleView.payments:
+        return ImfslPaymentMpesaConsole(
+          mpesaData: widget.opsMpesaData,
+          disbursementData: widget.opsDisbursementData,
+          mpesaKpis: widget.opsMpesaKpis,
+          isMpesaLoading: widget.isOpsMpesaLoading,
+          isDisbursementLoading: widget.isOpsDisbursementLoading,
+          onMpesaStatusFilter: widget.onOpsMpesaStatusFilter,
+          onMpesaPurposeFilter: widget.onOpsMpesaPurposeFilter,
+          onMpesaDateRange: widget.onOpsMpesaDateRange,
+          onDisbursementStatusFilter: widget.onOpsDisbursementStatusFilter,
+          onLoadMoreMpesa: widget.onLoadMoreOpsMpesa,
+          onLoadMoreDisbursements: widget.onLoadMoreOpsDisbursements,
+          onRefreshMpesa: widget.onRefreshOpsMpesa,
+          onRefreshDisbursements: widget.onRefreshOpsDisbursements,
+          onBack: () => setState(() => _opsConsoleView = _OpsConsoleView.executive),
+        );
+      case _OpsConsoleView.risk:
+        return ImfslRiskComplianceConsole(
+          collectionsData: widget.opsCollectionsData,
+          restructureData: widget.opsRestructureData,
+          instantLoanData: widget.opsInstantLoanData,
+          approvalsData: widget.opsApprovalsData,
+          isCollectionsLoading: widget.isOpsCollectionsLoading,
+          isRestructureLoading: widget.isOpsRestructureLoading,
+          isInstantLoanLoading: widget.isOpsInstantLoanLoading,
+          isApprovalsLoading: widget.isOpsApprovalsLoading,
+          onCollectionsParFilter: widget.onOpsCollectionsParFilter,
+          onCollectionsPriorityFilter: widget.onOpsCollectionsPriorityFilter,
+          onRestructureTypeFilter: widget.onOpsRestructureTypeFilter,
+          onRestructureStatusFilter: widget.onOpsRestructureStatusFilter,
+          onInstantLoanDecisionFilter: widget.onOpsInstantLoanDecisionFilter,
+          onApprovalsStatusFilter: widget.onOpsApprovalsStatusFilter,
+          onApprovalsEntityTypeFilter: widget.onOpsApprovalsEntityTypeFilter,
+          onLoadMoreCollections: widget.onLoadMoreOpsCollections,
+          onLoadMoreRestructure: widget.onLoadMoreOpsRestructure,
+          onLoadMoreInstantLoans: widget.onLoadMoreOpsInstantLoans,
+          onLoadMoreApprovals: widget.onLoadMoreOpsApprovals,
+          onRefreshCollections: widget.onRefreshOpsCollections,
+          onRefreshRestructure: widget.onRefreshOpsRestructure,
+          onRefreshInstantLoans: widget.onRefreshOpsInstantLoans,
+          onRefreshApprovals: widget.onRefreshOpsApprovals,
+          onBack: () => setState(() => _opsConsoleView = _OpsConsoleView.executive),
+        );
+      case _OpsConsoleView.customer360:
+        return ImfslCustomer360Console(
+          directoryData: widget.opsDirectoryData,
+          kycData: widget.opsKycData,
+          savingsData: widget.opsSavingsData,
+          guarantorData: widget.opsGuarantorData,
+          isDirectoryLoading: widget.isOpsDirectoryLoading,
+          isKycLoading: widget.isOpsKycLoading,
+          isSavingsLoading: widget.isOpsSavingsLoading,
+          isGuarantorLoading: widget.isOpsGuarantorLoading,
+          onDirectorySearch: widget.onOpsDirectorySearch,
+          onKycStatusFilter: widget.onOpsKycStatusFilter,
+          onSavingsStatusFilter: widget.onOpsSavingsStatusFilter,
+          onGuarantorStatusFilter: widget.onOpsGuarantorStatusFilter,
+          onLoadMoreDirectory: widget.onLoadMoreOpsDirectory,
+          onLoadMoreKyc: widget.onLoadMoreOpsKyc,
+          onLoadMoreSavings: widget.onLoadMoreOpsSavings,
+          onLoadMoreGuarantors: widget.onLoadMoreOpsGuarantors,
+          onRefreshDirectory: widget.onRefreshOpsDirectory,
+          onRefreshKyc: widget.onRefreshOpsKyc,
+          onRefreshSavings: widget.onRefreshOpsSavings,
+          onRefreshGuarantors: widget.onRefreshOpsGuarantors,
+          onBack: () => setState(() => _opsConsoleView = _OpsConsoleView.executive),
+        );
+    }
   }
 
   // ═══════════════════════════════════════════════════════════════════
@@ -880,6 +1280,11 @@ enum _AdminTab {
     icon: Icons.account_balance_outlined,
     activeIcon: Icons.account_balance,
   ),
+  approvals(
+    label: 'Approvals',
+    icon: Icons.approval_outlined,
+    activeIcon: Icons.approval,
+  ),
   collections(
     label: 'Collections',
     icon: Icons.account_balance_wallet_outlined,
@@ -910,10 +1315,20 @@ enum _AdminTab {
     icon: Icons.account_tree_outlined,
     activeIcon: Icons.account_tree,
   ),
+  mpesa(
+    label: 'M-Pesa',
+    icon: Icons.phone_android_outlined,
+    activeIcon: Icons.phone_android,
+  ),
   audit(
     label: 'Audit',
     icon: Icons.history_outlined,
     activeIcon: Icons.history,
+  ),
+  opsConsole(
+    label: 'Ops Console',
+    icon: Icons.dashboard_customize_outlined,
+    activeIcon: Icons.dashboard_customize,
   );
 
   const _AdminTab({

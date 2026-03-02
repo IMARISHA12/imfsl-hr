@@ -21,6 +21,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'admin_gateway_service.dart';
 import 'admin_app_home_screen.dart';
+import 'retool_dashboard_service.dart';
 
 class AdminAppLogic extends StatefulWidget {
   const AdminAppLogic({
@@ -44,6 +45,7 @@ class AdminAppLogic extends StatefulWidget {
 
 class _AdminAppLogicState extends State<AdminAppLogic> {
   late final AdminGatewayService _service;
+  late final RetoolDashboardService _retoolService;
   static const _primaryColor = Color(0xFF1565C0);
 
   // ═══════════════════════════════════════════════════════════════════
@@ -122,6 +124,76 @@ class _AdminAppLogicState extends State<AdminAppLogic> {
   String? _selectedBranch;
   bool _isBranchLoading = false;
 
+  // Approval Workflow
+  List<Map<String, dynamic>> _pendingApprovals = [];
+  int _pendingApprovalsTotal = 0;
+  List<Map<String, dynamic>> _approvalRules = [];
+  bool _isApprovalsLoading = false;
+  String _approvalsFilter = 'ALL';
+
+  // ── Ops Console — Executive ──
+  Map<String, dynamic> _executiveKpis = {};
+  List<Map<String, dynamic>> _topPortfolio = [];
+  List<Map<String, dynamic>> _recentMpesa = [];
+  bool _isOpsConsoleLoading = false;
+  bool _opsConsoleLoaded = false; // lazy-load flag
+
+  // ── Ops Console — Loan Operations ──
+  List<Map<String, dynamic>> _opsPipelineData = [];
+  List<Map<String, dynamic>> _opsPortfolioData = [];
+  List<Map<String, dynamic>> _opsRepaymentData = [];
+  bool _isOpsPipelineLoading = false;
+  bool _isOpsPortfolioLoading = false;
+  bool _isOpsRepaymentLoading = false;
+  String? _opsPipelineStatusFilter;
+  String? _opsPortfolioStatusFilter;
+  String? _opsPortfolioParFilter;
+  String? _opsRepaymentStatusFilter;
+  String? _opsRepaymentDateFrom;
+  String? _opsRepaymentDateTo;
+
+  // ── Ops Console — Payments & M-Pesa ──
+  List<Map<String, dynamic>> _opsMpesaData = [];
+  List<Map<String, dynamic>> _opsDisbursementData = [];
+  Map<String, dynamic> _opsMpesaKpis = {};
+  bool _isOpsMpesaLoading = false;
+  bool _isOpsDisbursementLoading = false;
+  String? _opsMpesaStatusFilter;
+  String? _opsMpesaPurposeFilter;
+  String? _opsMpesaDateFrom;
+  String? _opsMpesaDateTo;
+  String? _opsDisbursementStatusFilter;
+
+  // ── Ops Console — Risk & Compliance ──
+  List<Map<String, dynamic>> _opsCollectionsData = [];
+  List<Map<String, dynamic>> _opsRestructureData = [];
+  List<Map<String, dynamic>> _opsInstantLoanData = [];
+  List<Map<String, dynamic>> _opsApprovalsData = [];
+  bool _isOpsCollectionsLoading = false;
+  bool _isOpsRestructureLoading = false;
+  bool _isOpsInstantLoanLoading = false;
+  bool _isOpsApprovalsLoading = false;
+  String? _opsCollectionsParFilter;
+  String? _opsCollectionsPriorityFilter;
+  String? _opsRestructureTypeFilter;
+  String? _opsRestructureStatusFilter;
+  String? _opsInstantLoanDecisionFilter;
+  String? _opsApprovalsStatusFilter;
+  String? _opsApprovalsEntityTypeFilter;
+
+  // ── Ops Console — Customer 360 ──
+  List<Map<String, dynamic>> _opsDirectoryData = [];
+  List<Map<String, dynamic>> _opsKycData = [];
+  List<Map<String, dynamic>> _opsSavingsData = [];
+  List<Map<String, dynamic>> _opsGuarantorData = [];
+  bool _isOpsDirectoryLoading = false;
+  bool _isOpsKycLoading = false;
+  bool _isOpsSavingsLoading = false;
+  bool _isOpsGuarantorLoading = false;
+  String? _opsKycStatusFilter;
+  String? _opsSavingsStatusFilter;
+  String? _opsGuarantorStatusFilter;
+
   // ═══════════════════════════════════════════════════════════════════
   // LIFECYCLE
   // ═══════════════════════════════════════════════════════════════════
@@ -130,6 +202,7 @@ class _AdminAppLogicState extends State<AdminAppLogic> {
   void initState() {
     super.initState();
     _service = AdminGatewayService(client: widget.supabaseClient);
+    _retoolService = RetoolDashboardService(client: widget.supabaseClient);
     _loadInitialData();
   }
 
@@ -163,6 +236,8 @@ class _AdminAppLogicState extends State<AdminAppLogic> {
         futures.add(_loadSmsTemplates());
         futures.add(_loadRestructureQueue());
         futures.add(_loadBranchDashboard());
+        futures.add(_loadPendingApprovals());
+        if (role == 'ADMIN') futures.add(_loadApprovalRules());
       } else if (role == 'OFFICER') {
         futures.add(_loadStaffList());
         futures.add(_loadKycQueue());
@@ -174,6 +249,7 @@ class _AdminAppLogicState extends State<AdminAppLogic> {
         futures.add(_loadReportData());
         futures.add(_loadRestructureQueue());
         futures.add(_loadBranchDashboard());
+        futures.add(_loadPendingApprovals());
       } else if (role == 'AUDITOR') {
         futures.add(_loadAuditLog());
         futures.add(_loadReportData());
@@ -550,6 +626,61 @@ class _AdminAppLogicState extends State<AdminAppLogic> {
   }
 
   // ═══════════════════════════════════════════════════════════════════
+  // APPROVAL WORKFLOW DATA LOADERS
+  // ═══════════════════════════════════════════════════════════════════
+
+  Future<void> _loadPendingApprovals({bool append = false}) async {
+    if (mounted) setState(() => _isApprovalsLoading = true);
+    try {
+      final data = await _service.getMyApprovals(
+        limit: 50,
+        offset: append ? _pendingApprovals.length : 0,
+      );
+      if (mounted) {
+        setState(() {
+          final items = (data['items'] as List?)
+                  ?.map((e) => e is Map<String, dynamic>
+                      ? e
+                      : Map<String, dynamic>.from(e as Map))
+                  .toList() ??
+              [];
+          if (append) {
+            _pendingApprovals.addAll(items);
+          } else {
+            _pendingApprovals = items;
+          }
+          _pendingApprovalsTotal =
+              (data['total_count'] as num?)?.toInt() ?? items.length;
+          _isApprovalsLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isApprovalsLoading = false);
+        _showError('Failed to load pending approvals: $e');
+      }
+    }
+  }
+
+  Future<void> _loadApprovalRules() async {
+    try {
+      final data = await _service.getApprovalRules();
+      if (mounted) {
+        setState(() {
+          _approvalRules = (data['rules'] as List?)
+                  ?.map((e) => e is Map<String, dynamic>
+                      ? e
+                      : Map<String, dynamic>.from(e as Map))
+                  .toList() ??
+              [];
+        });
+      }
+    } catch (_) {
+      // Non-critical
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════════════
   // BRANCH PERFORMANCE DATA LOADERS
   // ═══════════════════════════════════════════════════════════════════
 
@@ -704,6 +835,189 @@ class _AdminAppLogicState extends State<AdminAppLogic> {
       _loadRestructureQueue();
     } catch (e) {
       _showError('Failed to record recovery: $e');
+    }
+  }
+
+  // ── Approvals ──
+
+  void _handleApprovalsFilterChange(String filter) {
+    setState(() => _approvalsFilter = filter);
+  }
+
+  Future<void> _handleProcessApproval(Map<String, dynamic> data) async {
+    try {
+      final result = await _service.processApproval(
+        entityType: data['entity_type'] ?? '',
+        entityId: data['entity_id'] ?? '',
+        decision: data['decision'] ?? '',
+        comments: data['comments'],
+        approvedAmount: data['approved_amount'] != null
+            ? (data['approved_amount'] as num).toDouble()
+            : null,
+      );
+      final status = result['status']?.toString() ?? 'processed';
+      _showSuccess('Approval $status');
+      _loadPendingApprovals();
+      _loadDashboard();
+      _loadLoanQueue();
+      _loadRestructureQueue();
+    } catch (e) {
+      _showError('Failed to process approval: $e');
+    }
+  }
+
+  Future<void> _handleViewApprovalChain(
+      String entityType, String entityId) async {
+    try {
+      final chain = await _service.getApprovalChain(
+        entityType: entityType,
+        entityId: entityId,
+      );
+      if (!mounted) return;
+      // Show chain in a dialog
+      showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Approval Chain'),
+          content: SizedBox(
+            width: double.maxFinite,
+            child: _buildApprovalChainContent(chain),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Close'),
+            ),
+          ],
+        ),
+      );
+    } catch (e) {
+      _showError('Failed to load approval chain: $e');
+    }
+  }
+
+  Widget _buildApprovalChainContent(Map<String, dynamic> chain) {
+    final steps = (chain['steps'] as List?) ?? [];
+    if (steps.isEmpty) {
+      return const Text('No approval workflow found.');
+    }
+    return SingleChildScrollView(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            chain['rule_description']?.toString() ?? '',
+            style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
+          ),
+          const SizedBox(height: 12),
+          ...steps.map((step) {
+            final s = step is Map<String, dynamic>
+                ? step
+                : Map<String, dynamic>.from(step as Map);
+            final status = s['status']?.toString() ?? 'UNKNOWN';
+            final stepNum = s['step_number'] ?? '?';
+            final role = s['required_min_role'] ?? '-';
+            final reviewer = s['reviewer_name']?.toString();
+            final comments = s['comments']?.toString();
+
+            Color statusColor;
+            IconData statusIcon;
+            switch (status) {
+              case 'APPROVED':
+                statusColor = Colors.green;
+                statusIcon = Icons.check_circle;
+                break;
+              case 'REJECTED':
+                statusColor = Colors.red;
+                statusIcon = Icons.cancel;
+                break;
+              case 'PENDING':
+                statusColor = Colors.blue;
+                statusIcon = Icons.radio_button_checked;
+                break;
+              default:
+                statusColor = Colors.grey;
+                statusIcon = Icons.radio_button_unchecked;
+            }
+
+            return Padding(
+              padding: const EdgeInsets.symmetric(vertical: 6),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(statusIcon, color: statusColor, size: 20),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Step $stepNum - $role ($status)',
+                            style: TextStyle(
+                                fontWeight: FontWeight.w600,
+                                color: statusColor)),
+                        if (reviewer != null)
+                          Text('Reviewed by: $reviewer',
+                              style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.grey.shade600)),
+                        if (comments != null && comments.isNotEmpty)
+                          Text(comments,
+                              style: TextStyle(
+                                  fontSize: 12,
+                                  fontStyle: FontStyle.italic,
+                                  color: Colors.grey.shade500)),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }),
+        ],
+      ),
+    );
+  }
+
+  void _handleLoadMoreApprovals() {
+    _loadPendingApprovals(append: true);
+  }
+
+  Future<void> _handleManageApprovalRules({
+    required String operation,
+    Map<String, dynamic> ruleData = const {},
+  }) async {
+    if (operation == 'LIST') {
+      _loadApprovalRules();
+      return;
+    }
+    try {
+      await _service.updateApprovalRule(
+        operation: operation,
+        ruleId: ruleData['rule_id'],
+        entityType: ruleData['entity_type'],
+        minAmount: ruleData['min_amount'] != null
+            ? (ruleData['min_amount'] as num).toDouble()
+            : null,
+        maxAmount: ruleData['max_amount'] != null
+            ? (ruleData['max_amount'] as num).toDouble()
+            : null,
+        riskCategory: ruleData['risk_category'],
+        requiredLevels: ruleData['required_levels'] != null
+            ? (ruleData['required_levels'] as num).toInt()
+            : null,
+        level1MinRole: ruleData['level_1_min_role'],
+        level2MinRole: ruleData['level_2_min_role'],
+        level3MinRole: ruleData['level_3_min_role'],
+        description: ruleData['description'],
+        priority: ruleData['priority'] != null
+            ? (ruleData['priority'] as num).toInt()
+            : null,
+      );
+      _showSuccess('Approval rule ${operation.toLowerCase()}d');
+      _loadApprovalRules();
+    } catch (e) {
+      _showError('Failed to manage approval rule: $e');
     }
   }
 
@@ -961,6 +1275,542 @@ class _AdminAppLogicState extends State<AdminAppLogic> {
     _loadAuditLog(append: true, filters: _lastAuditFilters);
   }
 
+  // ═══════════════════════════════════════════════════════════════════
+  // OPS CONSOLE DATA LOADERS
+  // ═══════════════════════════════════════════════════════════════════
+
+  Future<void> _loadOpsConsoleExecutive() async {
+    if (mounted) setState(() => _isOpsConsoleLoading = true);
+    try {
+      final results = await Future.wait([
+        _retoolService.getExecutiveKpis(),
+        _retoolService.getLoanPortfolio(status: 'ACTIVE', limit: 10),
+        _retoolService.getMpesaMonitor(limit: 10),
+      ]);
+      if (mounted) {
+        setState(() {
+          _executiveKpis = results[0] as Map<String, dynamic>;
+          _topPortfolio = results[1] as List<Map<String, dynamic>>;
+          _recentMpesa = results[2] as List<Map<String, dynamic>>;
+          _isOpsConsoleLoading = false;
+          _opsConsoleLoaded = true;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isOpsConsoleLoading = false);
+        _showError('Failed to load ops console: $e');
+      }
+    }
+  }
+
+  void _ensureOpsConsoleLoaded() {
+    if (!_opsConsoleLoaded && !_isOpsConsoleLoading) {
+      _loadOpsConsoleExecutive();
+    }
+  }
+
+  // ── Loan Operations Loaders ──
+
+  Future<void> _loadOpsPipeline({bool append = false}) async {
+    if (mounted) setState(() => _isOpsPipelineLoading = true);
+    try {
+      final data = await _retoolService.getLoanPipeline(
+        status: _opsPipelineStatusFilter,
+        limit: 25,
+        offset: append ? _opsPipelineData.length : 0,
+      );
+      if (mounted) {
+        setState(() {
+          if (append) {
+            _opsPipelineData.addAll(data);
+          } else {
+            _opsPipelineData = data;
+          }
+          _isOpsPipelineLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isOpsPipelineLoading = false);
+        _showError('Failed to load pipeline: $e');
+      }
+    }
+  }
+
+  Future<void> _loadOpsPortfolio({bool append = false}) async {
+    if (mounted) setState(() => _isOpsPortfolioLoading = true);
+    try {
+      final data = await _retoolService.getLoanPortfolio(
+        status: _opsPortfolioStatusFilter,
+        parBucket: _opsPortfolioParFilter,
+        limit: 25,
+        offset: append ? _opsPortfolioData.length : 0,
+      );
+      if (mounted) {
+        setState(() {
+          if (append) {
+            _opsPortfolioData.addAll(data);
+          } else {
+            _opsPortfolioData = data;
+          }
+          _isOpsPortfolioLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isOpsPortfolioLoading = false);
+        _showError('Failed to load portfolio: $e');
+      }
+    }
+  }
+
+  Future<void> _loadOpsRepayment({bool append = false}) async {
+    if (mounted) setState(() => _isOpsRepaymentLoading = true);
+    try {
+      final data = await _retoolService.getRepaymentMonitor(
+        status: _opsRepaymentStatusFilter,
+        dateFrom: _opsRepaymentDateFrom,
+        dateTo: _opsRepaymentDateTo,
+        limit: 25,
+        offset: append ? _opsRepaymentData.length : 0,
+      );
+      if (mounted) {
+        setState(() {
+          if (append) {
+            _opsRepaymentData.addAll(data);
+          } else {
+            _opsRepaymentData = data;
+          }
+          _isOpsRepaymentLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isOpsRepaymentLoading = false);
+        _showError('Failed to load repayments: $e');
+      }
+    }
+  }
+
+  // ── Payments & M-Pesa Loaders ──
+
+  Future<void> _loadOpsMpesa({bool append = false}) async {
+    if (mounted) setState(() => _isOpsMpesaLoading = true);
+    try {
+      final data = await _retoolService.getMpesaMonitor(
+        status: _opsMpesaStatusFilter,
+        purpose: _opsMpesaPurposeFilter,
+        dateFrom: _opsMpesaDateFrom,
+        dateTo: _opsMpesaDateTo,
+        limit: 25,
+        offset: append ? _opsMpesaData.length : 0,
+      );
+      if (mounted) {
+        setState(() {
+          if (append) {
+            _opsMpesaData.addAll(data);
+          } else {
+            _opsMpesaData = data;
+          }
+          _isOpsMpesaLoading = false;
+          // Compute KPIs from data
+          _computeMpesaKpis();
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isOpsMpesaLoading = false);
+        _showError('Failed to load M-Pesa data: $e');
+      }
+    }
+  }
+
+  void _computeMpesaKpis() {
+    double collectionsTotal = 0;
+    double disbursementsTotal = 0;
+    int pendingCount = 0;
+    int failedCount = 0;
+    for (final txn in _opsMpesaData) {
+      final amount = (txn['amount'] as num?)?.toDouble() ?? 0;
+      final status = txn['status']?.toString() ?? '';
+      if (status == 'COMPLETED') collectionsTotal += amount;
+      if (status == 'PENDING') pendingCount++;
+      if (status == 'FAILED') failedCount++;
+    }
+    for (final d in _opsDisbursementData) {
+      final amount = (d['amount'] as num?)?.toDouble() ?? 0;
+      final status = d['status']?.toString() ?? '';
+      if (status == 'COMPLETED') disbursementsTotal += amount;
+    }
+    _opsMpesaKpis = {
+      'collections_total': collectionsTotal,
+      'disbursements_total': disbursementsTotal,
+      'net_flow': collectionsTotal - disbursementsTotal,
+      'pending_count': pendingCount,
+      'failed_count': failedCount,
+    };
+  }
+
+  Future<void> _loadOpsDisbursements({bool append = false}) async {
+    if (mounted) setState(() => _isOpsDisbursementLoading = true);
+    try {
+      final data = await _retoolService.getDisbursementTracker(
+        status: _opsDisbursementStatusFilter,
+        limit: 25,
+        offset: append ? _opsDisbursementData.length : 0,
+      );
+      if (mounted) {
+        setState(() {
+          if (append) {
+            _opsDisbursementData.addAll(data);
+          } else {
+            _opsDisbursementData = data;
+          }
+          _isOpsDisbursementLoading = false;
+          _computeMpesaKpis();
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isOpsDisbursementLoading = false);
+        _showError('Failed to load disbursements: $e');
+      }
+    }
+  }
+
+  // ── Risk & Compliance Loaders ──
+
+  Future<void> _loadOpsCollections({bool append = false}) async {
+    if (mounted) setState(() => _isOpsCollectionsLoading = true);
+    try {
+      final data = await _retoolService.getCollectionsQueue(
+        parBucket: _opsCollectionsParFilter,
+        priority: _opsCollectionsPriorityFilter,
+        limit: 25,
+        offset: append ? _opsCollectionsData.length : 0,
+      );
+      if (mounted) {
+        setState(() {
+          if (append) {
+            _opsCollectionsData.addAll(data);
+          } else {
+            _opsCollectionsData = data;
+          }
+          _isOpsCollectionsLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isOpsCollectionsLoading = false);
+        _showError('Failed to load collections: $e');
+      }
+    }
+  }
+
+  Future<void> _loadOpsRestructure({bool append = false}) async {
+    if (mounted) setState(() => _isOpsRestructureLoading = true);
+    try {
+      final data = await _retoolService.getRestructureWriteoffQueue(
+        queueType: _opsRestructureTypeFilter,
+        status: _opsRestructureStatusFilter,
+        limit: 25,
+        offset: append ? _opsRestructureData.length : 0,
+      );
+      if (mounted) {
+        setState(() {
+          if (append) {
+            _opsRestructureData.addAll(data);
+          } else {
+            _opsRestructureData = data;
+          }
+          _isOpsRestructureLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isOpsRestructureLoading = false);
+        _showError('Failed to load restructure queue: $e');
+      }
+    }
+  }
+
+  Future<void> _loadOpsInstantLoans({bool append = false}) async {
+    if (mounted) setState(() => _isOpsInstantLoanLoading = true);
+    try {
+      final data = await _retoolService.getInstantLoanMonitor(
+        decision: _opsInstantLoanDecisionFilter,
+        limit: 25,
+        offset: append ? _opsInstantLoanData.length : 0,
+      );
+      if (mounted) {
+        setState(() {
+          if (append) {
+            _opsInstantLoanData.addAll(data);
+          } else {
+            _opsInstantLoanData = data;
+          }
+          _isOpsInstantLoanLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isOpsInstantLoanLoading = false);
+        _showError('Failed to load instant loans: $e');
+      }
+    }
+  }
+
+  Future<void> _loadOpsApprovals({bool append = false}) async {
+    if (mounted) setState(() => _isOpsApprovalsLoading = true);
+    try {
+      final data = await _retoolService.getApprovalQueue(
+        status: _opsApprovalsStatusFilter,
+        entityType: _opsApprovalsEntityTypeFilter,
+        limit: 25,
+        offset: append ? _opsApprovalsData.length : 0,
+      );
+      if (mounted) {
+        setState(() {
+          if (append) {
+            _opsApprovalsData.addAll(data);
+          } else {
+            _opsApprovalsData = data;
+          }
+          _isOpsApprovalsLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isOpsApprovalsLoading = false);
+        _showError('Failed to load approvals: $e');
+      }
+    }
+  }
+
+  // ── Customer 360 Loaders ──
+
+  Future<void> _loadOpsDirectory({bool append = false, String? search}) async {
+    if (mounted) setState(() => _isOpsDirectoryLoading = true);
+    try {
+      final data = await _retoolService.getCustomerDirectory(
+        search: search,
+        limit: 25,
+        offset: append ? _opsDirectoryData.length : 0,
+      );
+      if (mounted) {
+        setState(() {
+          if (append) {
+            _opsDirectoryData.addAll(data);
+          } else {
+            _opsDirectoryData = data;
+          }
+          _isOpsDirectoryLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isOpsDirectoryLoading = false);
+        _showError('Failed to load customer directory: $e');
+      }
+    }
+  }
+
+  Future<void> _loadOpsKyc({bool append = false}) async {
+    if (mounted) setState(() => _isOpsKycLoading = true);
+    try {
+      final data = await _retoolService.getKycQueue(
+        status: _opsKycStatusFilter,
+        limit: 25,
+        offset: append ? _opsKycData.length : 0,
+      );
+      if (mounted) {
+        setState(() {
+          if (append) {
+            _opsKycData.addAll(data);
+          } else {
+            _opsKycData = data;
+          }
+          _isOpsKycLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isOpsKycLoading = false);
+        _showError('Failed to load KYC data: $e');
+      }
+    }
+  }
+
+  Future<void> _loadOpsSavings({bool append = false}) async {
+    if (mounted) setState(() => _isOpsSavingsLoading = true);
+    try {
+      final data = await _retoolService.getSavingsOverview(
+        status: _opsSavingsStatusFilter,
+        limit: 25,
+        offset: append ? _opsSavingsData.length : 0,
+      );
+      if (mounted) {
+        setState(() {
+          if (append) {
+            _opsSavingsData.addAll(data);
+          } else {
+            _opsSavingsData = data;
+          }
+          _isOpsSavingsLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isOpsSavingsLoading = false);
+        _showError('Failed to load savings: $e');
+      }
+    }
+  }
+
+  Future<void> _loadOpsGuarantors({bool append = false}) async {
+    if (mounted) setState(() => _isOpsGuarantorLoading = true);
+    try {
+      final data = await _retoolService.getGuarantorRegistry(
+        status: _opsGuarantorStatusFilter,
+        limit: 25,
+        offset: append ? _opsGuarantorData.length : 0,
+      );
+      if (mounted) {
+        setState(() {
+          if (append) {
+            _opsGuarantorData.addAll(data);
+          } else {
+            _opsGuarantorData = data;
+          }
+          _isOpsGuarantorLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isOpsGuarantorLoading = false);
+        _showError('Failed to load guarantors: $e');
+      }
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════════════
+  // OPS CONSOLE HANDLER METHODS
+  // ═══════════════════════════════════════════════════════════════════
+
+  // ── Pipeline ──
+  void _handleOpsPipelineStatusFilter(String? status) {
+    _opsPipelineStatusFilter = status;
+    _loadOpsPipeline();
+  }
+
+  // ── Portfolio ──
+  void _handleOpsPortfolioStatusFilter(String? status) {
+    _opsPortfolioStatusFilter = status;
+    _loadOpsPortfolio();
+  }
+
+  void _handleOpsPortfolioParFilter(String? par) {
+    _opsPortfolioParFilter = par;
+    _loadOpsPortfolio();
+  }
+
+  // ── Repayment ──
+  void _handleOpsRepaymentStatusFilter(String? status) {
+    _opsRepaymentStatusFilter = status;
+    _loadOpsRepayment();
+  }
+
+  void _handleOpsRepaymentDateRange(String? from, String? to) {
+    _opsRepaymentDateFrom = from;
+    _opsRepaymentDateTo = to;
+    _loadOpsRepayment();
+  }
+
+  // ── M-Pesa ──
+  void _handleOpsMpesaStatusFilter(String? status) {
+    _opsMpesaStatusFilter = status;
+    _loadOpsMpesa();
+  }
+
+  void _handleOpsMpesaPurposeFilter(String? purpose) {
+    _opsMpesaPurposeFilter = purpose;
+    _loadOpsMpesa();
+  }
+
+  void _handleOpsMpesaDateRange(String? from, String? to) {
+    _opsMpesaDateFrom = from;
+    _opsMpesaDateTo = to;
+    _loadOpsMpesa();
+  }
+
+  void _handleOpsDisbursementStatusFilter(String? status) {
+    _opsDisbursementStatusFilter = status;
+    _loadOpsDisbursements();
+  }
+
+  // ── Collections ──
+  void _handleOpsCollectionsParFilter(String? par) {
+    _opsCollectionsParFilter = par;
+    _loadOpsCollections();
+  }
+
+  void _handleOpsCollectionsPriorityFilter(String? priority) {
+    _opsCollectionsPriorityFilter = priority;
+    _loadOpsCollections();
+  }
+
+  // ── Restructure/Writeoff ──
+  void _handleOpsRestructureTypeFilter(String? type) {
+    _opsRestructureTypeFilter = type;
+    _loadOpsRestructure();
+  }
+
+  void _handleOpsRestructureStatusFilter(String? status) {
+    _opsRestructureStatusFilter = status;
+    _loadOpsRestructure();
+  }
+
+  // ── Instant Loans ──
+  void _handleOpsInstantLoanDecisionFilter(String? decision) {
+    _opsInstantLoanDecisionFilter = decision;
+    _loadOpsInstantLoans();
+  }
+
+  // ── Approvals (Ops) ──
+  void _handleOpsApprovalsStatusFilter(String? status) {
+    _opsApprovalsStatusFilter = status;
+    _loadOpsApprovals();
+  }
+
+  void _handleOpsApprovalsEntityTypeFilter(String? entityType) {
+    _opsApprovalsEntityTypeFilter = entityType;
+    _loadOpsApprovals();
+  }
+
+  // ── Directory ──
+  void _handleOpsDirectorySearch(String query) {
+    _loadOpsDirectory(search: query.isNotEmpty ? query : null);
+  }
+
+  // ── KYC (Ops) ──
+  void _handleOpsKycStatusFilter(String? status) {
+    _opsKycStatusFilter = status;
+    _loadOpsKyc();
+  }
+
+  // ── Savings (Ops) ──
+  void _handleOpsSavingsStatusFilter(String? status) {
+    _opsSavingsStatusFilter = status;
+    _loadOpsSavings();
+  }
+
+  // ── Guarantors ──
+  void _handleOpsGuarantorStatusFilter(String? status) {
+    _opsGuarantorStatusFilter = status;
+    _loadOpsGuarantors();
+  }
+
   // ── Logout ──
 
   void _handleLogout() {
@@ -1213,6 +2063,104 @@ class _AdminAppLogicState extends State<AdminAppLogic> {
       onRefreshBranch: _loadBranchDashboard,
       onLoadBranchDetail: _loadBranchDetail,
       onLoadBranchTrend: _loadBranchTrend,
+      // Approval Workflow
+      pendingApprovals: _pendingApprovals,
+      pendingApprovalsTotal: _pendingApprovalsTotal,
+      approvalRules: _approvalRules,
+      isApprovalsLoading: _isApprovalsLoading,
+      approvalsFilter: _approvalsFilter,
+      onApprovalsFilterChange: _handleApprovalsFilterChange,
+      onProcessApproval: _handleProcessApproval,
+      onViewApprovalChain: _handleViewApprovalChain,
+      onRefreshApprovals: () => _loadPendingApprovals(),
+      onLoadMoreApprovals: _handleLoadMoreApprovals,
+      onManageApprovalRules: _handleManageApprovalRules,
+      // ── Ops Console ──
+      executiveKpis: _executiveKpis,
+      topPortfolio: _topPortfolio,
+      recentMpesa: _recentMpesa,
+      isOpsConsoleLoading: _isOpsConsoleLoading,
+      onRefreshOpsConsole: () {
+        _ensureOpsConsoleLoaded();
+        _loadOpsConsoleExecutive();
+      },
+      // Ops Console — Loan Operations
+      opsPipelineData: _opsPipelineData,
+      opsPortfolioData: _opsPortfolioData,
+      opsRepaymentData: _opsRepaymentData,
+      isOpsPipelineLoading: _isOpsPipelineLoading,
+      isOpsPortfolioLoading: _isOpsPortfolioLoading,
+      isOpsRepaymentLoading: _isOpsRepaymentLoading,
+      onRefreshOpsPipeline: () => _loadOpsPipeline(),
+      onRefreshOpsPortfolio: () => _loadOpsPortfolio(),
+      onRefreshOpsRepayment: () => _loadOpsRepayment(),
+      onLoadMoreOpsPipeline: () => _loadOpsPipeline(append: true),
+      onLoadMoreOpsPortfolio: () => _loadOpsPortfolio(append: true),
+      onLoadMoreOpsRepayment: () => _loadOpsRepayment(append: true),
+      onOpsPipelineStatusFilter: _handleOpsPipelineStatusFilter,
+      onOpsPortfolioStatusFilter: _handleOpsPortfolioStatusFilter,
+      onOpsPortfolioParFilter: _handleOpsPortfolioParFilter,
+      onOpsRepaymentStatusFilter: _handleOpsRepaymentStatusFilter,
+      onOpsRepaymentDateRange: _handleOpsRepaymentDateRange,
+      // Ops Console — Payments & M-Pesa
+      opsMpesaData: _opsMpesaData,
+      opsDisbursementData: _opsDisbursementData,
+      opsMpesaKpis: _opsMpesaKpis,
+      isOpsMpesaLoading: _isOpsMpesaLoading,
+      isOpsDisbursementLoading: _isOpsDisbursementLoading,
+      onRefreshOpsMpesa: () => _loadOpsMpesa(),
+      onRefreshOpsDisbursements: () => _loadOpsDisbursements(),
+      onLoadMoreOpsMpesa: () => _loadOpsMpesa(append: true),
+      onLoadMoreOpsDisbursements: () => _loadOpsDisbursements(append: true),
+      onOpsMpesaStatusFilter: _handleOpsMpesaStatusFilter,
+      onOpsMpesaPurposeFilter: _handleOpsMpesaPurposeFilter,
+      onOpsMpesaDateRange: _handleOpsMpesaDateRange,
+      onOpsDisbursementStatusFilter: _handleOpsDisbursementStatusFilter,
+      // Ops Console — Risk & Compliance
+      opsCollectionsData: _opsCollectionsData,
+      opsRestructureData: _opsRestructureData,
+      opsInstantLoanData: _opsInstantLoanData,
+      opsApprovalsData: _opsApprovalsData,
+      isOpsCollectionsLoading: _isOpsCollectionsLoading,
+      isOpsRestructureLoading: _isOpsRestructureLoading,
+      isOpsInstantLoanLoading: _isOpsInstantLoanLoading,
+      isOpsApprovalsLoading: _isOpsApprovalsLoading,
+      onRefreshOpsCollections: () => _loadOpsCollections(),
+      onRefreshOpsRestructure: () => _loadOpsRestructure(),
+      onRefreshOpsInstantLoans: () => _loadOpsInstantLoans(),
+      onRefreshOpsApprovals: () => _loadOpsApprovals(),
+      onLoadMoreOpsCollections: () => _loadOpsCollections(append: true),
+      onLoadMoreOpsRestructure: () => _loadOpsRestructure(append: true),
+      onLoadMoreOpsInstantLoans: () => _loadOpsInstantLoans(append: true),
+      onLoadMoreOpsApprovals: () => _loadOpsApprovals(append: true),
+      onOpsCollectionsParFilter: _handleOpsCollectionsParFilter,
+      onOpsCollectionsPriorityFilter: _handleOpsCollectionsPriorityFilter,
+      onOpsRestructureTypeFilter: _handleOpsRestructureTypeFilter,
+      onOpsRestructureStatusFilter: _handleOpsRestructureStatusFilter,
+      onOpsInstantLoanDecisionFilter: _handleOpsInstantLoanDecisionFilter,
+      onOpsApprovalsStatusFilter: _handleOpsApprovalsStatusFilter,
+      onOpsApprovalsEntityTypeFilter: _handleOpsApprovalsEntityTypeFilter,
+      // Ops Console — Customer 360
+      opsDirectoryData: _opsDirectoryData,
+      opsKycData: _opsKycData,
+      opsSavingsData: _opsSavingsData,
+      opsGuarantorData: _opsGuarantorData,
+      isOpsDirectoryLoading: _isOpsDirectoryLoading,
+      isOpsKycLoading: _isOpsKycLoading,
+      isOpsSavingsLoading: _isOpsSavingsLoading,
+      isOpsGuarantorLoading: _isOpsGuarantorLoading,
+      onRefreshOpsDirectory: () => _loadOpsDirectory(),
+      onRefreshOpsKyc: () => _loadOpsKyc(),
+      onRefreshOpsSavings: () => _loadOpsSavings(),
+      onRefreshOpsGuarantors: () => _loadOpsGuarantors(),
+      onLoadMoreOpsDirectory: () => _loadOpsDirectory(append: true),
+      onLoadMoreOpsKyc: () => _loadOpsKyc(append: true),
+      onLoadMoreOpsSavings: () => _loadOpsSavings(append: true),
+      onLoadMoreOpsGuarantors: () => _loadOpsGuarantors(append: true),
+      onOpsDirectorySearch: _handleOpsDirectorySearch,
+      onOpsKycStatusFilter: _handleOpsKycStatusFilter,
+      onOpsSavingsStatusFilter: _handleOpsSavingsStatusFilter,
+      onOpsGuarantorStatusFilter: _handleOpsGuarantorStatusFilter,
       // Global
       onLogout: _handleLogout,
     );

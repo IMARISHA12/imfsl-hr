@@ -1,7 +1,7 @@
 // IMFSL Admin Gateway Service
 // ============================
 // Typed wrapper for the `imfsl-admin-gateway` Supabase edge function.
-// 33 actions with RBAC (ADMIN, MANAGER, OFFICER, AUDITOR, TELLER).
+// 41 actions with RBAC (ADMIN, MANAGER, OFFICER, AUDITOR, TELLER).
 //
 // Usage:
 //   final service = AdminGatewayService(client: Supabase.instance.client);
@@ -558,6 +558,139 @@ class AdminGatewayService {
     final result = await _call('branch_trend', {
       'branch_id': branchId,
       'months': months,
+    });
+    return _asMap(result);
+  }
+
+  // ═══════════════════════════════════════════════════════════════════
+  // M-PESA RECONCILIATION
+  // ═══════════════════════════════════════════════════════════════════
+
+  /// Returns M-Pesa reconciliation dashboard with stats and transactions.
+  Future<Map<String, dynamic>> getMpesaDashboard({
+    String? status,
+    String? fromDate,
+    String? toDate,
+    int limit = 50,
+    int offset = 0,
+  }) async {
+    final result = await _call('mpesa_dashboard', {
+      if (status != null) 'status': status,
+      if (fromDate != null) 'from_date': fromDate,
+      if (toDate != null) 'to_date': toDate,
+      'limit': limit,
+      'offset': offset,
+    });
+    return _asMap(result);
+  }
+
+  /// Manually reconciles a completed but unreconciled M-Pesa transaction.
+  Future<Map<String, dynamic>> mpesaManualReconcile({
+    required String transactionId,
+    required String appliedToType,
+    required String appliedToId,
+  }) async {
+    final result = await _call('mpesa_manual_reconcile', {
+      'transaction_id': transactionId,
+      'applied_to_type': appliedToType,
+      'applied_to_id': appliedToId,
+    });
+    return _asMap(result);
+  }
+
+  /// Searches M-Pesa transactions by receipt, phone, checkout ID, or amount.
+  Future<List<Map<String, dynamic>>> mpesaSearchTransactions(
+      String query, {int limit = 20}) async {
+    final result = await _call('mpesa_search', {
+      'query': query,
+      'limit': limit,
+    });
+    if (result is Map<String, dynamic> && result.containsKey('results')) {
+      return _asList(result['results']);
+    }
+    return _asList(result);
+  }
+
+  // ═══════════════════════════════════════════════════════════════════
+  // APPROVAL WORKFLOW
+  // ═══════════════════════════════════════════════════════════════════
+
+  /// Returns pending approvals for the current staff member's role.
+  Future<Map<String, dynamic>> getMyApprovals({
+    int limit = 50,
+    int offset = 0,
+  }) async {
+    final result = await _call('my_approvals', {
+      'limit': limit,
+      'offset': offset,
+    });
+    return _asMap(result);
+  }
+
+  /// Processes an approval step (APPROVE or REJECT).
+  Future<Map<String, dynamic>> processApproval({
+    required String entityType,
+    required String entityId,
+    required String decision,
+    String? comments,
+    double? approvedAmount,
+  }) async {
+    final result = await _call('process_approval', {
+      'entity_type': entityType,
+      'entity_id': entityId,
+      'decision': decision,
+      if (comments != null) 'comments': comments,
+      if (approvedAmount != null) 'approved_amount': approvedAmount,
+    });
+    return _asMap(result);
+  }
+
+  /// Returns the full approval chain for an entity.
+  Future<Map<String, dynamic>> getApprovalChain({
+    required String entityType,
+    required String entityId,
+  }) async {
+    final result = await _call('approval_chain', {
+      'entity_type': entityType,
+      'entity_id': entityId,
+    });
+    return _asMap(result);
+  }
+
+  /// Returns all approval rules. ADMIN only.
+  Future<Map<String, dynamic>> getApprovalRules() async {
+    final result = await _call('approval_rules');
+    return _asMap(result);
+  }
+
+  /// Creates, updates, or deactivates an approval rule. ADMIN only.
+  Future<Map<String, dynamic>> updateApprovalRule({
+    required String operation,
+    String? ruleId,
+    String? entityType,
+    double? minAmount,
+    double? maxAmount,
+    String? riskCategory,
+    int? requiredLevels,
+    String? level1MinRole,
+    String? level2MinRole,
+    String? level3MinRole,
+    String? description,
+    int? priority,
+  }) async {
+    final result = await _call('update_approval_rule', {
+      'operation': operation,
+      if (ruleId != null) 'rule_id': ruleId,
+      if (entityType != null) 'entity_type': entityType,
+      if (minAmount != null) 'min_amount': minAmount,
+      if (maxAmount != null) 'max_amount': maxAmount,
+      if (riskCategory != null) 'risk_category': riskCategory,
+      if (requiredLevels != null) 'required_levels': requiredLevels,
+      if (level1MinRole != null) 'level_1_min_role': level1MinRole,
+      if (level2MinRole != null) 'level_2_min_role': level2MinRole,
+      if (level3MinRole != null) 'level_3_min_role': level3MinRole,
+      if (description != null) 'description': description,
+      if (priority != null) 'priority': priority,
     });
     return _asMap(result);
   }

@@ -1,13 +1,15 @@
 // IMFSL Customer App Home Screen
 // ===============================
-// Main navigation shell integrating all 8 customer widgets:
+// Main navigation shell integrating all 9 customer widgets:
 //   KYC Onboarding, Loan Products Catalog, My Loans, Savings Accounts,
-//   Credit Score, Notifications Center, Customer Profile, M-Pesa Payment
+//   Credit Score, Notifications Center, Customer Profile, M-Pesa Payment,
+//   Payment Center
 //
 // Structure:
-//   - 4-tab bottom navigation (Home, Loans, Savings, More)
+//   - 5-tab bottom navigation (Home, Loans, Pay, Savings, More)
 //   - Overlay navigation for sub-screens with back-button support
 //   - Home dashboard with balance card, quick actions, and summary cards
+//   - Pay tab with payment center (quick-pay, history, receipts)
 //   - Cross-widget navigation (Pay Now → M-Pesa, Browse Products, etc.)
 //   - Notification badge on app bar bell icon
 //   - KYC status banner for unverified customers
@@ -32,6 +34,7 @@ import 'mpesa_payment_widget.dart';
 import 'loan_prequalification_card.dart';
 import 'payment_reminder_card.dart';
 import 'payment_history_widget.dart';
+import 'imfsl_payment_center.dart';
 
 enum _OverlayScreen {
   loanProducts,
@@ -114,6 +117,21 @@ class CustomerAppHomeScreen extends StatefulWidget {
     this.onRefreshUpcomingPayments,
     this.onLoadPaymentHistory,
     this.onLoadMorePaymentHistory,
+    // ── Payment Center ────────────────────────────────────────────
+    this.paymentCenterSummary = const {},
+    this.paymentCenterRecentPayments = const [],
+    this.paymentCenterRecentTotal = 0,
+    this.isPaymentCenterLoading = false,
+    this.paymentCenterFilter = 'ALL',
+    this.onPaymentCenterFilterChange,
+    this.onPaymentCenterPayLoan,
+    this.onPaymentCenterDepositSavings,
+    this.onPaymentCenterViewReceipt,
+    this.onPaymentCenterRefresh,
+    this.onPaymentCenterLoadMore,
+    this.onPaymentCenterInitiatePayment,
+    // ── Savings Summary ──
+    this.savingsSummary = const {},
     // ── Terminal callbacks ──
     this.onLogout,
     this.onViewAllTransactions,
@@ -207,6 +225,23 @@ class CustomerAppHomeScreen extends StatefulWidget {
   final VoidCallback? onRefreshUpcomingPayments;
   final Function(String loanId, {int limit, int offset})? onLoadPaymentHistory;
   final VoidCallback? onLoadMorePaymentHistory;
+
+  // ── Payment Center ─────────────────────────────────────────────────
+  final Map<String, dynamic> paymentCenterSummary;
+  final List<Map<String, dynamic>> paymentCenterRecentPayments;
+  final int paymentCenterRecentTotal;
+  final bool isPaymentCenterLoading;
+  final String paymentCenterFilter;
+  final Function(String filter)? onPaymentCenterFilterChange;
+  final Function(Map<String, dynamic> loan)? onPaymentCenterPayLoan;
+  final Function(Map<String, dynamic> account)? onPaymentCenterDepositSavings;
+  final Function(String transactionId)? onPaymentCenterViewReceipt;
+  final VoidCallback? onPaymentCenterRefresh;
+  final VoidCallback? onPaymentCenterLoadMore;
+  final VoidCallback? onPaymentCenterInitiatePayment;
+
+  // ── Savings Summary ────────────────────────────────────────────────
+  final Map<String, dynamic> savingsSummary;
 
   // ── Terminal callbacks ─────────────────────────────────────────────
   final VoidCallback? onLogout;
@@ -364,6 +399,7 @@ class _CustomerAppHomeScreenState extends State<CustomerAppHomeScreen>
                     children: [
                       _buildHomeTab(),
                       _buildLoansTab(),
+                      _buildPayTab(),
                       _buildSavingsTab(),
                       _buildMoreTab(),
                     ],
@@ -1199,7 +1235,29 @@ class _CustomerAppHomeScreenState extends State<CustomerAppHomeScreen>
   }
 
   // ═════════════════════════════════════════════════════════════════════
-  // TAB 2 — SAVINGS
+  // TAB 2 — PAY (Payment Center)
+  // ═════════════════════════════════════════════════════════════════════
+
+  Widget _buildPayTab() {
+    return ImfslPaymentCenter(
+      summary: widget.paymentCenterSummary,
+      recentPayments: widget.paymentCenterRecentPayments,
+      recentPaymentsTotalCount: widget.paymentCenterRecentTotal,
+      isLoading: widget.isPaymentCenterLoading,
+      currentFilter: widget.paymentCenterFilter,
+      onFilterChange: widget.onPaymentCenterFilterChange,
+      onPayLoan: widget.onPaymentCenterPayLoan,
+      onDepositSavings: widget.onPaymentCenterDepositSavings,
+      onViewReceipt: widget.onPaymentCenterViewReceipt,
+      onRefresh: widget.onPaymentCenterRefresh,
+      onLoadMore: widget.onPaymentCenterLoadMore,
+      onInitiatePayment: widget.onPaymentCenterInitiatePayment ??
+          () => _openOverlay(_OverlayScreen.mpesaPayment),
+    );
+  }
+
+  // ═════════════════════════════════════════════════════════════════════
+  // TAB 3 — SAVINGS
   // ═════════════════════════════════════════════════════════════════════
 
   Widget _buildSavingsTab() {
@@ -1227,7 +1285,7 @@ class _CustomerAppHomeScreenState extends State<CustomerAppHomeScreen>
   }
 
   // ═════════════════════════════════════════════════════════════════════
-  // TAB 3 — MORE MENU
+  // TAB 4 — MORE MENU
   // ═════════════════════════════════════════════════════════════════════
 
   Widget _buildMoreTab() {
@@ -1476,6 +1534,11 @@ class _CustomerAppHomeScreenState extends State<CustomerAppHomeScreen>
             icon: Icon(Icons.account_balance_outlined),
             activeIcon: Icon(Icons.account_balance),
             label: 'Loans',
+          ),
+          const BottomNavigationBarItem(
+            icon: Icon(Icons.account_balance_wallet_outlined),
+            activeIcon: Icon(Icons.account_balance_wallet),
+            label: 'Pay',
           ),
           const BottomNavigationBarItem(
             icon: Icon(Icons.savings_outlined),

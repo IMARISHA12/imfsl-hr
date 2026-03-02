@@ -18,8 +18,19 @@ class MpesaPaymentWidget extends StatefulWidget {
       Map<String, dynamic> paymentData)? onInitiatePayment;
   final Future<Map<String, dynamic>> Function(String transactionId)?
       onCheckPaymentStatus;
+  /// Called to fetch full payment receipt (reconciliation status, receipt number).
+  /// Uses the `payment_receipt` gateway action for real-time callback status.
+  final Future<Map<String, dynamic>> Function(String transactionId)?
+      onGetPaymentReceipt;
   final Function(Map<String, dynamic> result)? onSuccess;
   final VoidCallback? onCancel;
+
+  /// Pre-selects a loan for repayment (loan ID from active_loans).
+  /// When set, auto-selects "Loan Repayment" type and the matching loan.
+  final String? preSelectedLoanId;
+
+  /// Pre-fills the amount field (e.g. next due amount from payment center).
+  final double? preFilledAmount;
 
   const MpesaPaymentWidget({
     super.key,
@@ -28,8 +39,11 @@ class MpesaPaymentWidget extends StatefulWidget {
     this.defaultPhoneNumber = '',
     this.onInitiatePayment,
     this.onCheckPaymentStatus,
+    this.onGetPaymentReceipt,
     this.onSuccess,
     this.onCancel,
+    this.preSelectedLoanId,
+    this.preFilledAmount,
   });
 
   @override
@@ -62,9 +76,10 @@ class _MpesaPaymentWidgetState extends State<MpesaPaymentWidget>
   bool _isInitiating = false;
   String _transactionId = '';
   int _pollCount = 0;
-  static const int _maxPolls = 12; // 12 * 5s = 60s timeout
+  static const int _maxPolls = 20; // 20 * 3s = 60s timeout
   Timer? _pollTimer;
   String _errorMessage = '';
+  String _statusMessage = 'Initiating payment...';
   Map<String, dynamic> _successResult = {};
 
   // Success animation
@@ -85,6 +100,21 @@ class _MpesaPaymentWidgetState extends State<MpesaPaymentWidget>
       parent: _successAnimController,
       curve: Curves.elasticOut,
     );
+
+    // Pre-fill from payment center quick-pay
+    if (widget.preSelectedLoanId != null && widget.loans.isNotEmpty) {
+      _selectedType = _PaymentType.loanRepayment;
+      for (final loan in widget.loans) {
+        final loanId = loan['id']?.toString() ?? '';
+        if (loanId == widget.preSelectedLoanId) {
+          _selectedLoan = loan;
+          break;
+        }
+      }
+    }
+    if (widget.preFilledAmount != null && widget.preFilledAmount! > 0) {
+      _amountController.text = widget.preFilledAmount!.toStringAsFixed(0);
+    }
   }
 
   @override
@@ -233,8 +263,11 @@ class _MpesaPaymentWidgetState extends State<MpesaPaymentWidget>
   void _startPolling() {
     _pollTimer?.cancel();
     _pollCount = 0;
+    if (mounted) {
+      setState(() => _statusMessage = 'Waiting for M-Pesa confirmation...');
+    }
 
-    _pollTimer = Timer.periodic(const Duration(seconds: 5), (timer) async {
+    _pollTimer = Timer.periodic(const Duration(seconds: 3), (timer) async {
       if (!mounted) {
         timer.cancel();
         return;
@@ -251,17 +284,36 @@ class _MpesaPaymentWidgetState extends State<MpesaPaymentWidget>
         return;
       }
 
+      // Update status message based on poll count
+      if (mounted && _pollCount <= 3) {
+        setState(() => _statusMessage = 'Waiting for M-Pesa confirmation...');
+      } else if (mounted && _pollCount <= 8) {
+        setState(() => _statusMessage = 'Processing payment...');
+      } else if (mounted) {
+        setState(() => _statusMessage = 'Still waiting... Please check your phone.');
+      }
+
       try {
         Map<String, dynamic> statusResponse;
-        if (widget.onCheckPaymentStatus != null) {
+
+        // Prefer onGetPaymentReceipt (uses callback-aware payment_receipt action)
+        if (widget.onGetPaymentReceipt != null) {
+          statusResponse =
+              await widget.onGetPaymentReceipt!(_transactionId);
+        } else if (widget.onCheckPaymentStatus != null) {
           statusResponse =
               await widget.onCheckPaymentStatus!(_transactionId);
         } else {
           // Simulate - succeed after 3 polls
           if (_pollCount >= 3) {
-            statusResponse = {'status': 'COMPLETED', 'amount': _amountController.text};
+            statusResponse = {
+              'status': 'COMPLETED',
+              'amount': _amountController.text,
+              'mpesa_receipt_number': 'SIM${DateTime.now().millisecondsSinceEpoch}',
+              'applied_to_type': 'LOAN_REPAYMENT',
+            };
           } else {
-            statusResponse = {'status': 'PENDING'};
+            statusResponse = {'status': 'INITIATED'};
           }
         }
 
@@ -277,15 +329,24 @@ class _MpesaPaymentWidgetState extends State<MpesaPaymentWidget>
             _phase = _PaymentPhase.success;
           });
           _successAnimController.forward();
-        } else if (status == 'FAILED' || status == 'EXPIRED') {
+        } else if (status == 'FAILED') {
           timer.cancel();
           setState(() {
-            _errorMessage = statusResponse['message']?.toString() ??
+            _errorMessage = statusResponse['result_desc']?.toString() ??
+                statusResponse['message']?.toString() ??
                 'Payment failed. Please try again.';
             _phase = _PaymentPhase.failed;
           });
+        } else if (status == 'EXPIRED' || status == 'CANCELLED') {
+          timer.cancel();
+          setState(() {
+            _errorMessage = status == 'EXPIRED'
+                ? 'Payment request expired. Please try again.'
+                : 'Payment was cancelled.';
+            _phase = _PaymentPhase.failed;
+          });
         }
-        // PENDING — keep polling (no setState needed)
+        // INITIATED / PROCESSING — keep polling
       } catch (e) {
         // Network error during poll — don't stop, try again next tick
         debugPrint('Poll error: $e');
@@ -1194,7 +1255,7 @@ class _MpesaPaymentWidgetState extends State<MpesaPaymentWidget>
                       ? 'Confirmation Timed Out'
                       : 'M-Pesa Confirmation',
           subtitle: _phase == _PaymentPhase.processing
-              ? 'Check your phone for the STK prompt...'
+              ? _statusMessage
               : _phase == _PaymentPhase.success
                   ? 'Payment confirmed by M-Pesa'
                   : _phase == _PaymentPhase.timedOut
@@ -1417,6 +1478,61 @@ class _MpesaPaymentWidgetState extends State<MpesaPaymentWidget>
           textAlign: TextAlign.center,
           style: TextStyle(fontSize: 14, color: Colors.grey.shade700),
         ),
+        if (_successResult['mpesa_receipt_number'] != null) ...[
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            decoration: BoxDecoration(
+              color: Colors.grey.shade100,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Column(
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text('Receipt', style: TextStyle(color: Colors.grey.shade600, fontSize: 13)),
+                    Text(
+                      _successResult['mpesa_receipt_number'].toString(),
+                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                    ),
+                  ],
+                ),
+                if (_successResult['amount'] != null) ...[
+                  const SizedBox(height: 4),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text('Amount', style: TextStyle(color: Colors.grey.shade600, fontSize: 13)),
+                      Text(
+                        _formatCurrency(double.tryParse(_successResult['amount'].toString()) ?? 0),
+                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                      ),
+                    ],
+                  ),
+                ],
+                if (_successResult['applied_to_type'] != null &&
+                    _successResult['applied_to_type'] != 'NONE') ...[
+                  const SizedBox(height: 4),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text('Applied To', style: TextStyle(color: Colors.grey.shade600, fontSize: 13)),
+                      Text(
+                        _successResult['applied_to_type'] == 'LOAN_REPAYMENT'
+                            ? 'Loan Repayment'
+                            : _successResult['applied_to_type'] == 'SAVINGS_DEPOSIT'
+                                ? 'Savings Deposit'
+                                : _successResult['applied_to_type'].toString(),
+                        style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: _mpesaGreen),
+                      ),
+                    ],
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
         const SizedBox(height: 24),
         SizedBox(
           width: double.infinity,

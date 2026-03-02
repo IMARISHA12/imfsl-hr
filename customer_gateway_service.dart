@@ -1,7 +1,7 @@
 // IMFSL Customer Gateway Service
 // ================================
 // Thin service layer that wraps all calls to the `imfsl-customer-gateway`
-// Supabase edge function. One method per action (33 actions + helpers).
+// Supabase edge function. One method per action (41 actions + helpers).
 //
 // Usage:
 //   final service = CustomerGatewayService(client: Supabase.instance.client);
@@ -266,8 +266,7 @@ class CustomerGatewayService {
   /// Used for polling during the payment flow.
   Future<Map<String, dynamic>> checkPaymentStatus(
       String transactionId) async {
-    final result = await _call('mpesa_pay', {
-      'check_status': true,
+    final result = await _call('check_status', {
       'transaction_id': transactionId,
     });
     return _asMap(result);
@@ -428,6 +427,44 @@ class CustomerGatewayService {
   }
 
   // ═══════════════════════════════════════════════════════════════════
+  // ONBOARDING
+  // ═══════════════════════════════════════════════════════════════════
+
+  /// Returns the onboarding status for the authenticated user.
+  /// Possible statuses: NEEDS_KYC, KYC_PENDING, KYC_UNDER_REVIEW,
+  /// KYC_REJECTED, KYC_APPROVED_NO_CUSTOMER, WELCOME, COMPLETE.
+  Future<Map<String, dynamic>> getOnboardingStatus() async {
+    final result = await _call('onboarding_status');
+    return _asMap(result);
+  }
+
+  /// Opportunistically links auth_user_id to existing customer/KYC records
+  /// matched by phone or email. Safe to call on every app startup.
+  Future<Map<String, dynamic>> linkAuth() async {
+    final result = await _call('link_auth');
+    return _asMap(result);
+  }
+
+  /// Marks the welcome screen as shown for the current customer.
+  Future<void> markWelcomeShown() async {
+    await _call('mark_welcome_shown');
+  }
+
+  // ═══════════════════════════════════════════════════════════════════
+  // PAYMENT RECEIPT
+  // ═══════════════════════════════════════════════════════════════════
+
+  /// Returns full M-Pesa transaction details including reconciliation status.
+  /// Used for real-time payment polling after STK push initiation.
+  Future<Map<String, dynamic>> getPaymentReceipt(
+      String transactionId) async {
+    final result = await _call('payment_receipt', {
+      'transaction_id': transactionId,
+    });
+    return _asMap(result);
+  }
+
+  // ═══════════════════════════════════════════════════════════════════
   // RESTRUCTURE STATUS
   // ═══════════════════════════════════════════════════════════════════
 
@@ -435,6 +472,42 @@ class CustomerGatewayService {
   Future<List<Map<String, dynamic>>> getMyRestructureStatus() async {
     final result = await _call('my_restructure_status');
     return _asList(result);
+  }
+
+  // ═══════════════════════════════════════════════════════════════════
+  // PAYMENT CENTER
+  // ═══════════════════════════════════════════════════════════════════
+
+  /// Returns aggregated payment dashboard data: monthly totals, active
+  /// loans/savings quick-pay info, and pending payments.
+  Future<Map<String, dynamic>> getPaymentCenterSummary() async {
+    final result = await _call('payment_center_summary');
+    return _asMap(result);
+  }
+
+  /// Returns a formatted receipt for a completed M-Pesa transaction,
+  /// including applied-to info (loan/savings) and customer details.
+  Future<Map<String, dynamic>> getFormattedReceipt({
+    required String transactionId,
+  }) async {
+    final result = await _call('formatted_receipt', {
+      'transaction_id': transactionId,
+    });
+    return _asMap(result);
+  }
+
+  /// Returns paginated M-Pesa payment history, optionally filtered by purpose.
+  Future<Map<String, dynamic>> getRecentPayments({
+    int limit = 20,
+    int offset = 0,
+    String? purpose,
+  }) async {
+    final result = await _call('recent_payments', {
+      'limit': limit,
+      'offset': offset,
+      if (purpose != null) 'purpose': purpose,
+    });
+    return _asMap(result);
   }
 
   // ═══════════════════════════════════════════════════════════════════
