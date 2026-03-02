@@ -194,6 +194,17 @@ class _AdminAppLogicState extends State<AdminAppLogic> {
   String? _opsSavingsStatusFilter;
   String? _opsGuarantorStatusFilter;
 
+  // ── Ops Console — Support Center ──
+  List<Map<String, dynamic>> _opsTicketData = [];
+  List<Map<String, dynamic>> _opsWithdrawalData = [];
+  bool _isOpsTicketLoading = false;
+  bool _isOpsWithdrawalLoading = false;
+  String? _opsTicketStatusFilter;
+  String? _opsTicketCategoryFilter;
+  String? _opsTicketPriorityFilter;
+  String? _opsWithdrawalStatusFilter;
+  String? _opsWithdrawalChannelFilter;
+
   // ═══════════════════════════════════════════════════════════════════
   // LIFECYCLE
   // ═══════════════════════════════════════════════════════════════════
@@ -1694,6 +1705,63 @@ class _AdminAppLogicState extends State<AdminAppLogic> {
     }
   }
 
+  // ── Support Center Loaders ──
+
+  Future<void> _loadOpsTickets({bool append = false}) async {
+    if (mounted) setState(() => _isOpsTicketLoading = true);
+    try {
+      final data = await _retoolService.getSupportTicketQueue(
+        status: _opsTicketStatusFilter,
+        category: _opsTicketCategoryFilter,
+        priority: _opsTicketPriorityFilter,
+        limit: 25,
+        offset: append ? _opsTicketData.length : 0,
+      );
+      if (mounted) {
+        setState(() {
+          if (append) {
+            _opsTicketData.addAll(data);
+          } else {
+            _opsTicketData = data;
+          }
+          _isOpsTicketLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isOpsTicketLoading = false);
+        _showError('Failed to load tickets: $e');
+      }
+    }
+  }
+
+  Future<void> _loadOpsWithdrawals({bool append = false}) async {
+    if (mounted) setState(() => _isOpsWithdrawalLoading = true);
+    try {
+      final data = await _retoolService.getSavingsWithdrawalQueue(
+        status: _opsWithdrawalStatusFilter,
+        channel: _opsWithdrawalChannelFilter,
+        limit: 25,
+        offset: append ? _opsWithdrawalData.length : 0,
+      );
+      if (mounted) {
+        setState(() {
+          if (append) {
+            _opsWithdrawalData.addAll(data);
+          } else {
+            _opsWithdrawalData = data;
+          }
+          _isOpsWithdrawalLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isOpsWithdrawalLoading = false);
+        _showError('Failed to load withdrawals: $e');
+      }
+    }
+  }
+
   // ═══════════════════════════════════════════════════════════════════
   // OPS CONSOLE HANDLER METHODS
   // ═══════════════════════════════════════════════════════════════════
@@ -1809,6 +1877,32 @@ class _AdminAppLogicState extends State<AdminAppLogic> {
   void _handleOpsGuarantorStatusFilter(String? status) {
     _opsGuarantorStatusFilter = status;
     _loadOpsGuarantors();
+  }
+
+  // ── Support Center ──
+  void _handleOpsTicketStatusFilter(String? status) {
+    _opsTicketStatusFilter = status;
+    _loadOpsTickets();
+  }
+
+  void _handleOpsTicketCategoryFilter(String? category) {
+    _opsTicketCategoryFilter = category;
+    _loadOpsTickets();
+  }
+
+  void _handleOpsTicketPriorityFilter(String? priority) {
+    _opsTicketPriorityFilter = priority;
+    _loadOpsTickets();
+  }
+
+  void _handleOpsWithdrawalStatusFilter(String? status) {
+    _opsWithdrawalStatusFilter = status;
+    _loadOpsWithdrawals();
+  }
+
+  void _handleOpsWithdrawalChannelFilter(String? channel) {
+    _opsWithdrawalChannelFilter = channel;
+    _loadOpsWithdrawals();
   }
 
   // ── Logout ──
@@ -2161,6 +2255,20 @@ class _AdminAppLogicState extends State<AdminAppLogic> {
       onOpsKycStatusFilter: _handleOpsKycStatusFilter,
       onOpsSavingsStatusFilter: _handleOpsSavingsStatusFilter,
       onOpsGuarantorStatusFilter: _handleOpsGuarantorStatusFilter,
+      // Ops Console — Support Center
+      opsTicketData: _opsTicketData,
+      opsWithdrawalData: _opsWithdrawalData,
+      isOpsTicketLoading: _isOpsTicketLoading,
+      isOpsWithdrawalLoading: _isOpsWithdrawalLoading,
+      onRefreshOpsTickets: () => _loadOpsTickets(),
+      onRefreshOpsWithdrawals: () => _loadOpsWithdrawals(),
+      onLoadMoreOpsTickets: () => _loadOpsTickets(append: true),
+      onLoadMoreOpsWithdrawals: () => _loadOpsWithdrawals(append: true),
+      onOpsTicketStatusFilter: _handleOpsTicketStatusFilter,
+      onOpsTicketCategoryFilter: _handleOpsTicketCategoryFilter,
+      onOpsTicketPriorityFilter: _handleOpsTicketPriorityFilter,
+      onOpsWithdrawalStatusFilter: _handleOpsWithdrawalStatusFilter,
+      onOpsWithdrawalChannelFilter: _handleOpsWithdrawalChannelFilter,
       // Global
       onLogout: _handleLogout,
     );

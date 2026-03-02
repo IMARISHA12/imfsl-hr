@@ -12,6 +12,8 @@ class ImfslExecutiveConsole extends StatefulWidget {
   final bool isLoading;
   final VoidCallback? onRefresh;
   final Function(String consoleName)? onNavigate;
+  final int openTicketCount;
+  final int pendingWithdrawalCount;
 
   const ImfslExecutiveConsole({
     super.key,
@@ -21,6 +23,8 @@ class ImfslExecutiveConsole extends StatefulWidget {
     this.isLoading = false,
     this.onRefresh,
     this.onNavigate,
+    this.openTicketCount = 0,
+    this.pendingWithdrawalCount = 0,
   });
 
   @override
@@ -492,6 +496,30 @@ class _ImfslExecutiveConsoleState extends State<ImfslExecutiveConsole> {
       ));
     }
 
+    if (widget.openTicketCount > 0) {
+      banners.add(_buildAlertBanner(
+        icon: Icons.support_agent_rounded,
+        message:
+            '${widget.openTicketCount} support ticket${widget.openTicketCount == 1 ? '' : 's'} need attention',
+        backgroundColor: _infoPurple.withOpacity(0.08),
+        borderColor: _infoPurple.withOpacity(0.3),
+        textColor: _infoPurple,
+        iconColor: _infoPurple,
+      ));
+    }
+
+    if (widget.pendingWithdrawalCount > 0) {
+      banners.add(_buildAlertBanner(
+        icon: Icons.account_balance_wallet_rounded,
+        message:
+            '${widget.pendingWithdrawalCount} withdrawal${widget.pendingWithdrawalCount == 1 ? '' : 's'} pending approval',
+        backgroundColor: _warningOrange.withOpacity(0.08),
+        borderColor: _warningOrange.withOpacity(0.3),
+        textColor: _warningOrange,
+        iconColor: _warningOrange,
+      ));
+    }
+
     if (banners.isEmpty) return const SizedBox.shrink();
 
     return Column(
@@ -608,6 +636,14 @@ class _ImfslExecutiveConsoleState extends State<ImfslExecutiveConsole> {
               metricLabel: 'Customers',
               metricValue: _formatNumber(
                   widget.executiveKpis['total_active_customers']),
+            ),
+            _buildQuickNavCard(
+              title: 'Support Center',
+              icon: Icons.support_agent,
+              color: const Color(0xFF7B1FA2),
+              consoleName: 'supportCenter',
+              metricLabel: 'Open Tickets',
+              metricValue: _formatNumber(widget.openTicketCount),
             ),
           ],
         ),

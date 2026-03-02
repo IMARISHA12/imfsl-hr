@@ -39,12 +39,13 @@ import 'imfsl_loan_operations_console.dart';
 import 'imfsl_payment_mpesa_console.dart';
 import 'imfsl_risk_compliance_console.dart';
 import 'imfsl_customer_360_console.dart';
+import 'imfsl_support_withdrawal_console.dart';
 
 /// Overlay screens that sit on top of the tab content.
 enum _OverlayScreen { none, staffOnboarding, staffProfile }
 
 /// Sub-console views within the Ops Console tab.
-enum _OpsConsoleView { executive, loanOps, payments, risk, customer360 }
+enum _OpsConsoleView { executive, loanOps, payments, risk, customer360, supportCenter }
 
 class AdminAppHomeScreen extends StatefulWidget {
   const AdminAppHomeScreen({
@@ -259,6 +260,20 @@ class AdminAppHomeScreen extends StatefulWidget {
     this.onOpsKycStatusFilter,
     this.onOpsSavingsStatusFilter,
     this.onOpsGuarantorStatusFilter,
+    // Ops Console — Support Center
+    this.opsTicketData = const [],
+    this.opsWithdrawalData = const [],
+    this.isOpsTicketLoading = false,
+    this.isOpsWithdrawalLoading = false,
+    this.onRefreshOpsTickets,
+    this.onRefreshOpsWithdrawals,
+    this.onLoadMoreOpsTickets,
+    this.onLoadMoreOpsWithdrawals,
+    this.onOpsTicketStatusFilter,
+    this.onOpsTicketCategoryFilter,
+    this.onOpsTicketPriorityFilter,
+    this.onOpsWithdrawalStatusFilter,
+    this.onOpsWithdrawalChannelFilter,
     // ── Global ──
     this.onLogout,
   });
@@ -496,6 +511,21 @@ class AdminAppHomeScreen extends StatefulWidget {
   final Function(String?)? onOpsKycStatusFilter;
   final Function(String?)? onOpsSavingsStatusFilter;
   final Function(String?)? onOpsGuarantorStatusFilter;
+
+  // ── Ops Console — Support Center ──
+  final List<Map<String, dynamic>> opsTicketData;
+  final List<Map<String, dynamic>> opsWithdrawalData;
+  final bool isOpsTicketLoading;
+  final bool isOpsWithdrawalLoading;
+  final VoidCallback? onRefreshOpsTickets;
+  final VoidCallback? onRefreshOpsWithdrawals;
+  final VoidCallback? onLoadMoreOpsTickets;
+  final VoidCallback? onLoadMoreOpsWithdrawals;
+  final Function(String?)? onOpsTicketStatusFilter;
+  final Function(String?)? onOpsTicketCategoryFilter;
+  final Function(String?)? onOpsTicketPriorityFilter;
+  final Function(String?)? onOpsWithdrawalStatusFilter;
+  final Function(String?)? onOpsWithdrawalChannelFilter;
 
   // ── Global ──
   final VoidCallback? onLogout;
@@ -1114,6 +1144,9 @@ class _AdminAppHomeScreenState extends State<AdminAppHomeScreen> {
         case 'customer360':
           _opsConsoleView = _OpsConsoleView.customer360;
           break;
+        case 'supportCenter':
+          _opsConsoleView = _OpsConsoleView.supportCenter;
+          break;
         default:
           _opsConsoleView = _OpsConsoleView.executive;
       }
@@ -1130,6 +1163,8 @@ class _AdminAppHomeScreenState extends State<AdminAppHomeScreen> {
           isLoading: widget.isOpsConsoleLoading,
           onRefresh: widget.onRefreshOpsConsole,
           onNavigate: _navigateOpsConsole,
+          openTicketCount: _computeOpenTicketCount(),
+          pendingWithdrawalCount: _computePendingWithdrawalCount(),
         );
       case _OpsConsoleView.loanOps:
         return ImfslLoanOperationsConsole(
@@ -1220,7 +1255,51 @@ class _AdminAppHomeScreenState extends State<AdminAppHomeScreen> {
           onRefreshGuarantors: widget.onRefreshOpsGuarantors,
           onBack: () => setState(() => _opsConsoleView = _OpsConsoleView.executive),
         );
+      case _OpsConsoleView.supportCenter:
+        return ImfslSupportWithdrawalConsole(
+          ticketData: widget.opsTicketData,
+          withdrawalData: widget.opsWithdrawalData,
+          isTicketLoading: widget.isOpsTicketLoading,
+          isWithdrawalLoading: widget.isOpsWithdrawalLoading,
+          onTicketStatusFilter: widget.onOpsTicketStatusFilter,
+          onTicketCategoryFilter: widget.onOpsTicketCategoryFilter,
+          onTicketPriorityFilter: widget.onOpsTicketPriorityFilter,
+          onWithdrawalStatusFilter: widget.onOpsWithdrawalStatusFilter,
+          onWithdrawalChannelFilter: widget.onOpsWithdrawalChannelFilter,
+          onLoadMoreTickets: widget.onLoadMoreOpsTickets,
+          onLoadMoreWithdrawals: widget.onLoadMoreOpsWithdrawals,
+          onRefreshTickets: widget.onRefreshOpsTickets,
+          onRefreshWithdrawals: widget.onRefreshOpsWithdrawals,
+          onBack: () => setState(() => _opsConsoleView = _OpsConsoleView.executive),
+        );
     }
+  }
+
+  int _computeOpenTicketCount() {
+    final kpiCount = widget.executiveKpis['open_support_tickets'];
+    if (kpiCount != null) {
+      if (kpiCount is int) return kpiCount;
+      if (kpiCount is double) return kpiCount.toInt();
+      return int.tryParse(kpiCount.toString()) ?? 0;
+    }
+    return widget.opsTicketData
+        .where((t) {
+          final s = t['status']?.toString().toUpperCase() ?? '';
+          return s == 'OPEN' || s == 'IN_PROGRESS' || s == 'WAITING_CUSTOMER';
+        })
+        .length;
+  }
+
+  int _computePendingWithdrawalCount() {
+    final kpiCount = widget.executiveKpis['pending_withdrawals'];
+    if (kpiCount != null) {
+      if (kpiCount is int) return kpiCount;
+      if (kpiCount is double) return kpiCount.toInt();
+      return int.tryParse(kpiCount.toString()) ?? 0;
+    }
+    return widget.opsWithdrawalData
+        .where((w) => w['status']?.toString().toUpperCase() == 'PENDING')
+        .length;
   }
 
   // ═══════════════════════════════════════════════════════════════════

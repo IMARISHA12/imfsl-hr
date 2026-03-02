@@ -403,21 +403,25 @@ class RetoolDashboardService {
   }
 
   // ═══════════════════════════════════════════════════════════════════
-  // SUPPORT TICKET QUEUE (direct table query)
+  // V20 — SUPPORT TICKET QUEUE
   // ═══════════════════════════════════════════════════════════════════
 
   Future<List<Map<String, dynamic>>> getSupportTicketQueue({
     String? status,
     String? category,
+    String? priority,
     int limit = 25,
     int offset = 0,
   }) async {
-    var query = _client.from('imfsl_support_tickets').select();
+    var query = _client.from('vw_retool_imfsl_support_ticket_queue').select();
     if (status != null && status.isNotEmpty) {
       query = query.eq('status', status);
     }
     if (category != null && category.isNotEmpty) {
       query = query.eq('category', category);
+    }
+    if (priority != null && priority.isNotEmpty) {
+      query = query.eq('priority', priority);
     }
     return await query
         .order('created_at', ascending: false)
@@ -425,17 +429,21 @@ class RetoolDashboardService {
   }
 
   // ═══════════════════════════════════════════════════════════════════
-  // SAVINGS WITHDRAWAL QUEUE (direct table query)
+  // V21 — SAVINGS WITHDRAWAL QUEUE
   // ═══════════════════════════════════════════════════════════════════
 
   Future<List<Map<String, dynamic>>> getSavingsWithdrawalQueue({
     String? status,
+    String? channel,
     int limit = 25,
     int offset = 0,
   }) async {
-    var query = _client.from('imfsl_savings_withdrawals').select();
+    var query = _client.from('vw_retool_imfsl_withdrawal_queue').select();
     if (status != null && status.isNotEmpty) {
       query = query.eq('status', status);
+    }
+    if (channel != null && channel.isNotEmpty) {
+      query = query.eq('channel', channel);
     }
     return await query
         .order('created_at', ascending: false)
