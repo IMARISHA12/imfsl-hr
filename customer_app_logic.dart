@@ -35,6 +35,7 @@ import 'imfsl_support_tickets.dart';
 import 'imfsl_guarantor_management.dart';
 import 'imfsl_savings_withdrawal.dart';
 import 'imfsl_loan_restructure_request.dart';
+import 'imfsl_loan_calculator.dart';
 
 class CustomerAppLogic extends StatefulWidget {
   const CustomerAppLogic({
@@ -1301,6 +1302,7 @@ class _CustomerAppLogicState extends State<CustomerAppLogic> {
       onViewLoanStatement: _handleViewLoanStatement,
       onCalculateSchedule: _handleCalculateSchedule,
       onApplyLoan: _handleApplyLoan,
+      onCalculatorApplyNow: _handleApplyLoan,
       // ── Savings callbacks ──
       onLoadAccountDetail: _handleLoadAccountDetail,
       onWithdraw: _handleWithdraw,

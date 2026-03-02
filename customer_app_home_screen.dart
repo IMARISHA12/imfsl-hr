@@ -39,6 +39,7 @@ import 'imfsl_support_tickets.dart';
 import 'imfsl_guarantor_management.dart';
 import 'imfsl_savings_withdrawal.dart';
 import 'imfsl_loan_restructure_request.dart';
+import 'imfsl_loan_calculator.dart';
 
 enum _OverlayScreen {
   loanProducts,
@@ -53,6 +54,7 @@ enum _OverlayScreen {
   guarantorManagement,
   savingsWithdrawal,
   restructureRequest,
+  loanCalculator,
 }
 
 class CustomerAppHomeScreen extends StatefulWidget {
@@ -167,6 +169,8 @@ class CustomerAppHomeScreen extends StatefulWidget {
     this.isRestructureLoading = false,
     this.onRequestRestructure,
     this.onRefreshRestructures,
+    // ── Loan Calculator ─────────────────────────────────────────────────
+    this.onCalculatorApplyNow,
     // ── Terminal callbacks ──
     this.onLogout,
     this.onViewAllTransactions,
@@ -312,6 +316,9 @@ class CustomerAppHomeScreen extends StatefulWidget {
   final Function(String loanId, String type, String reason, int? term)?
       onRequestRestructure;
   final VoidCallback? onRefreshRestructures;
+
+  // ── Loan Calculator ─────────────────────────────────────────────────
+  final Function(Map<String, dynamic> product)? onCalculatorApplyNow;
 
   // ── Terminal callbacks ─────────────────────────────────────────────
   final VoidCallback? onLogout;
@@ -615,6 +622,15 @@ class _CustomerAppHomeScreenState extends State<CustomerAppHomeScreen>
           isLoading: widget.isRestructureLoading,
           onRequestRestructure: widget.onRequestRestructure,
           onRefresh: widget.onRefreshRestructures,
+        );
+      case _OverlayScreen.loanCalculator:
+        title = 'Loan Calculator';
+        child = ImfslLoanCalculator(
+          loanProducts: widget.loanProducts,
+          onApplyNow: (product) {
+            _closeOverlay();
+            widget.onCalculatorApplyNow?.call(product);
+          },
         );
     }
 
@@ -936,8 +952,8 @@ class _CustomerAppHomeScreenState extends State<CustomerAppHomeScreen>
         _openOverlay(_OverlayScreen.creditScore);
       }),
       _QuickAction(
-          Icons.verified_user_outlined, 'KYC', const Color(0xFF37474F), () {
-        _openOverlay(_OverlayScreen.kyc);
+          Icons.calculate_outlined, 'Calculator', const Color(0xFF0277BD), () {
+        _openOverlay(_OverlayScreen.loanCalculator);
       }),
     ];
 
@@ -1500,6 +1516,12 @@ class _CustomerAppHomeScreenState extends State<CustomerAppHomeScreen>
             label: 'M-Pesa Payment',
             color: const Color(0xFF4CAF50),
             onTap: () => _openOverlay(_OverlayScreen.mpesaPayment),
+          ),
+          _buildMoreMenuItem(
+            icon: Icons.calculate_outlined,
+            label: 'Loan Calculator',
+            color: const Color(0xFF0277BD),
+            onTap: () => _openOverlay(_OverlayScreen.loanCalculator),
           ),
           _buildMoreMenuItem(
             icon: Icons.receipt_long,
