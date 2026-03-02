@@ -1,7 +1,7 @@
 // IMFSL Customer Gateway Service
 // ================================
 // Thin service layer that wraps all calls to the `imfsl-customer-gateway`
-// Supabase edge function. One method per action (41 actions + helpers).
+// Supabase edge function. One method per action (53 actions + helpers).
 //
 // Usage:
 //   final service = CustomerGatewayService(client: Supabase.instance.client);
@@ -508,6 +508,162 @@ class CustomerGatewayService {
       if (purpose != null) 'purpose': purpose,
     });
     return _asMap(result);
+  }
+
+  // ═══════════════════════════════════════════════════════════════════
+  // SUPPORT TICKETS
+  // ═══════════════════════════════════════════════════════════════════
+
+  /// Creates a new support ticket with an initial message.
+  Future<Map<String, dynamic>> createSupportTicket({
+    required String category,
+    required String subject,
+    required String message,
+    String? loanId,
+    String? transactionId,
+  }) async {
+    final result = await _call('create_ticket', {
+      'category': category,
+      'subject': subject,
+      'message': message,
+      if (loanId != null) 'loan_id': loanId,
+      if (transactionId != null) 'transaction_id': transactionId,
+    });
+    return _asMap(result);
+  }
+
+  /// Returns the customer's tickets with optional status filter.
+  Future<List<Map<String, dynamic>>> getMyTickets({
+    String? status,
+    int limit = 20,
+    int offset = 0,
+  }) async {
+    final result = await _call('my_tickets', {
+      if (status != null) 'status': status,
+      'limit': limit,
+      'offset': offset,
+    });
+    return _asList(result);
+  }
+
+  /// Returns ticket detail with full conversation thread.
+  Future<Map<String, dynamic>> getTicketDetail(String ticketId) async {
+    final result = await _call('ticket_detail', {'ticket_id': ticketId});
+    return _asMap(result);
+  }
+
+  /// Adds a message to an existing ticket.
+  Future<Map<String, dynamic>> addTicketMessage({
+    required String ticketId,
+    required String message,
+  }) async {
+    final result = await _call('add_ticket_message', {
+      'ticket_id': ticketId,
+      'message': message,
+    });
+    return _asMap(result);
+  }
+
+  // ═══════════════════════════════════════════════════════════════════
+  // SAVINGS WITHDRAWALS
+  // ═══════════════════════════════════════════════════════════════════
+
+  /// Requests a savings withdrawal. Balance is held atomically.
+  Future<Map<String, dynamic>> requestSavingsWithdrawal({
+    required String savingsAccountId,
+    required double amount,
+    String channel = 'MPESA',
+    String? destinationPhone,
+  }) async {
+    final result = await _call('request_withdrawal', {
+      'savings_account_id': savingsAccountId,
+      'amount': amount,
+      'channel': channel,
+      if (destinationPhone != null) 'destination_phone': destinationPhone,
+    });
+    return _asMap(result);
+  }
+
+  /// Returns the customer's withdrawal history.
+  Future<List<Map<String, dynamic>>> getMyWithdrawals({
+    String? status,
+    int limit = 20,
+    int offset = 0,
+  }) async {
+    final result = await _call('my_withdrawals', {
+      if (status != null) 'status': status,
+      'limit': limit,
+      'offset': offset,
+    });
+    return _asList(result);
+  }
+
+  // ═══════════════════════════════════════════════════════════════════
+  // GUARANTOR SELF-SERVICE
+  // ═══════════════════════════════════════════════════════════════════
+
+  /// Returns guarantor commitments where the customer is the guarantor.
+  Future<List<Map<String, dynamic>>> getMyGuarantorCommitments() async {
+    final result = await _call('my_guarantor_commitments');
+    return _asList(result);
+  }
+
+  /// Returns unlinked guarantor invites matching the customer's phone/ID.
+  Future<List<Map<String, dynamic>>> getGuarantorInvites() async {
+    final result = await _call('guarantor_invites');
+    return _asList(result);
+  }
+
+  /// Accepts or declines a guarantor request.
+  Future<Map<String, dynamic>> respondToGuarantor({
+    required String guarantorId,
+    required String response,
+  }) async {
+    final result = await _call('respond_to_guarantor', {
+      'guarantor_id': guarantorId,
+      'response': response,
+    });
+    return _asMap(result);
+  }
+
+  /// Links an unlinked guarantor record to the customer's account.
+  Future<Map<String, dynamic>> linkGuarantor(String guarantorId) async {
+    final result = await _call('link_guarantor', {
+      'guarantor_id': guarantorId,
+    });
+    return _asMap(result);
+  }
+
+  // ═══════════════════════════════════════════════════════════════════
+  // LOAN RESTRUCTURE (Customer Self-Service)
+  // ═══════════════════════════════════════════════════════════════════
+
+  /// Submits a customer-initiated loan restructure request.
+  Future<Map<String, dynamic>> requestRestructure({
+    required String loanId,
+    required String type,
+    required String reason,
+    int? requestedTerm,
+  }) async {
+    final result = await _call('request_restructure', {
+      'loan_id': loanId,
+      'type': type,
+      'reason': reason,
+      if (requestedTerm != null) 'requested_term': requestedTerm,
+    });
+    return _asMap(result);
+  }
+
+  /// Returns the customer's restructure requests with approval progress.
+  Future<List<Map<String, dynamic>>> getMyRestructureRequests({
+    int limit = 20,
+    int offset = 0,
+  }) async {
+    final result = await _call('my_restructure_requests', {
+      'limit': limit,
+      'offset': offset,
+    });
+    return _asList(result);
   }
 
   // ═══════════════════════════════════════════════════════════════════

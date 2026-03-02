@@ -35,6 +35,10 @@ import 'loan_prequalification_card.dart';
 import 'payment_reminder_card.dart';
 import 'payment_history_widget.dart';
 import 'imfsl_payment_center.dart';
+import 'imfsl_support_tickets.dart';
+import 'imfsl_guarantor_management.dart';
+import 'imfsl_savings_withdrawal.dart';
+import 'imfsl_loan_restructure_request.dart';
 
 enum _OverlayScreen {
   loanProducts,
@@ -45,6 +49,10 @@ enum _OverlayScreen {
   mpesaPayment,
   instantLoan,
   paymentHistory,
+  supportTickets,
+  guarantorManagement,
+  savingsWithdrawal,
+  restructureRequest,
 }
 
 class CustomerAppHomeScreen extends StatefulWidget {
@@ -132,6 +140,33 @@ class CustomerAppHomeScreen extends StatefulWidget {
     this.onPaymentCenterInitiatePayment,
     // ── Savings Summary ──
     this.savingsSummary = const {},
+    // ── Support Tickets ────────────────────────────────────────────────
+    this.supportTickets = const [],
+    this.isSupportLoading = false,
+    this.onCreateTicket,
+    this.onAddTicketMessage,
+    this.onLoadTicketDetail,
+    this.onRefreshTickets,
+    this.onLoadMoreTickets,
+    this.onFilterTicketStatus,
+    // ── Guarantor Management ───────────────────────────────────────────
+    this.guarantorCommitments = const [],
+    this.guarantorInvites = const [],
+    this.isGuarantorLoading = false,
+    this.onGuarantorRespond,
+    this.onGuarantorLink,
+    this.onRefreshGuarantors,
+    // ── Savings Withdrawal ─────────────────────────────────────────────
+    this.savingsWithdrawals = const [],
+    this.isWithdrawalLoading = false,
+    this.onRequestWithdrawal,
+    this.onRefreshWithdrawals,
+    this.onLoadMoreWithdrawals,
+    // ── Loan Restructure Request ───────────────────────────────────────
+    this.restructureRequests = const [],
+    this.isRestructureLoading = false,
+    this.onRequestRestructure,
+    this.onRefreshRestructures,
     // ── Terminal callbacks ──
     this.onLogout,
     this.onViewAllTransactions,
@@ -242,6 +277,41 @@ class CustomerAppHomeScreen extends StatefulWidget {
 
   // ── Savings Summary ────────────────────────────────────────────────
   final Map<String, dynamic> savingsSummary;
+
+  // ── Support Tickets ─────────────────────────────────────────────────
+  final List<Map<String, dynamic>> supportTickets;
+  final bool isSupportLoading;
+  final Function(String category, String subject, String message,
+      String? loanId, String? txnId)? onCreateTicket;
+  final Function(String ticketId, String message)? onAddTicketMessage;
+  final Future<Map<String, dynamic>> Function(String ticketId)?
+      onLoadTicketDetail;
+  final VoidCallback? onRefreshTickets;
+  final VoidCallback? onLoadMoreTickets;
+  final Function(String? status)? onFilterTicketStatus;
+
+  // ── Guarantor Management ────────────────────────────────────────────
+  final List<Map<String, dynamic>> guarantorCommitments;
+  final List<Map<String, dynamic>> guarantorInvites;
+  final bool isGuarantorLoading;
+  final Function(String guarantorId, String response)? onGuarantorRespond;
+  final Function(String guarantorId)? onGuarantorLink;
+  final VoidCallback? onRefreshGuarantors;
+
+  // ── Savings Withdrawal ──────────────────────────────────────────────
+  final List<Map<String, dynamic>> savingsWithdrawals;
+  final bool isWithdrawalLoading;
+  final Function(String accountId, double amount, String channel,
+      String? phone)? onRequestWithdrawal;
+  final VoidCallback? onRefreshWithdrawals;
+  final VoidCallback? onLoadMoreWithdrawals;
+
+  // ── Loan Restructure Request ────────────────────────────────────────
+  final List<Map<String, dynamic>> restructureRequests;
+  final bool isRestructureLoading;
+  final Function(String loanId, String type, String reason, int? term)?
+      onRequestRestructure;
+  final VoidCallback? onRefreshRestructures;
 
   // ── Terminal callbacks ─────────────────────────────────────────────
   final VoidCallback? onLogout;
@@ -498,6 +568,54 @@ class _CustomerAppHomeScreenState extends State<CustomerAppHomeScreen>
           onLoadMore: widget.onLoadMorePaymentHistory,
           onBack: _closeOverlay,
         );
+      case _OverlayScreen.supportTickets:
+        title = 'Support & Disputes';
+        child = ImfslSupportTickets(
+          tickets: widget.supportTickets,
+          isLoading: widget.isSupportLoading,
+          onCreateTicket: widget.onCreateTicket,
+          onAddMessage: widget.onAddTicketMessage,
+          onLoadTicketDetail: widget.onLoadTicketDetail,
+          onRefresh: widget.onRefreshTickets,
+          onLoadMore: widget.onLoadMoreTickets,
+          onFilterStatus: widget.onFilterTicketStatus,
+          loanOptions: widget.loans,
+        );
+      case _OverlayScreen.guarantorManagement:
+        title = 'My Guarantors';
+        child = ImfslGuarantorManagement(
+          commitments: widget.guarantorCommitments,
+          invites: widget.guarantorInvites,
+          isLoading: widget.isGuarantorLoading,
+          onRespond: widget.onGuarantorRespond,
+          onLink: widget.onGuarantorLink,
+          onRefresh: widget.onRefreshGuarantors,
+        );
+      case _OverlayScreen.savingsWithdrawal:
+        title = 'Withdraw Savings';
+        child = ImfslSavingsWithdrawal(
+          savingsAccounts: widget.savingsAccounts,
+          withdrawals: widget.savingsWithdrawals,
+          isLoading: widget.isWithdrawalLoading,
+          onRequestWithdrawal: widget.onRequestWithdrawal,
+          onRefresh: widget.onRefreshWithdrawals,
+          onLoadMore: widget.onLoadMoreWithdrawals,
+          profilePhone: widget.customerPhone,
+        );
+      case _OverlayScreen.restructureRequest:
+        title = 'Loan Restructure';
+        child = ImfslLoanRestructureRequest(
+          eligibleLoans: widget.loans
+              .where((l) {
+                final s = (l['status'] as String? ?? '').toUpperCase();
+                return s == 'ACTIVE' || s == 'OVERDUE';
+              })
+              .toList(),
+          myRequests: widget.restructureRequests,
+          isLoading: widget.isRestructureLoading,
+          onRequestRestructure: widget.onRequestRestructure,
+          onRefresh: widget.onRefreshRestructures,
+        );
     }
 
     return Scaffold(
@@ -568,6 +686,8 @@ class _CustomerAppHomeScreenState extends State<CustomerAppHomeScreen>
               const SizedBox(height: 16),
             ],
             _buildQuickActionsGrid(),
+            const SizedBox(height: 16),
+            _buildNeedHelpCard(),
             const SizedBox(height: 20),
             if (_firstActiveLoan != null) ...[
               _buildActiveLoanSummary(),
@@ -860,6 +980,52 @@ class _CustomerAppHomeScreenState extends State<CustomerAppHomeScreen>
                 style:
                     const TextStyle(fontSize: 11, fontWeight: FontWeight.w500),
                 textAlign: TextAlign.center),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ── Need Help card ───────────────────────────────────────────────
+
+  Widget _buildNeedHelpCard() {
+    return GestureDetector(
+      onTap: () => _openOverlay(_OverlayScreen.supportTickets),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        decoration: BoxDecoration(
+          color: const Color(0xFF5C6BC0).withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+              color: const Color(0xFF5C6BC0).withValues(alpha: 0.2)),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: const Color(0xFF5C6BC0).withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: const Icon(Icons.support_agent,
+                  color: Color(0xFF5C6BC0), size: 22),
+            ),
+            const SizedBox(width: 12),
+            const Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Need Help?',
+                      style:
+                          TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+                  Text('Create a support ticket',
+                      style: TextStyle(fontSize: 12, color: Colors.grey)),
+                ],
+              ),
+            ),
+            const Icon(Icons.chevron_right, color: Colors.grey, size: 20),
           ],
         ),
       ),
@@ -1340,6 +1506,41 @@ class _CustomerAppHomeScreenState extends State<CustomerAppHomeScreen>
             label: 'Transaction History',
             color: _warningColor,
             onTap: widget.onViewAllTransactions,
+          ),
+          const SizedBox(height: 8),
+          const Divider(),
+          Padding(
+            padding: const EdgeInsets.only(left: 14, top: 8, bottom: 4),
+            child: Text('Self-Service',
+                style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.grey[500],
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: 0.5)),
+          ),
+          _buildMoreMenuItem(
+            icon: Icons.support_agent,
+            label: 'Support & Disputes',
+            color: const Color(0xFF5C6BC0),
+            onTap: () => _openOverlay(_OverlayScreen.supportTickets),
+          ),
+          _buildMoreMenuItem(
+            icon: Icons.handshake_outlined,
+            label: 'My Guarantors',
+            color: const Color(0xFF00838F),
+            onTap: () => _openOverlay(_OverlayScreen.guarantorManagement),
+          ),
+          _buildMoreMenuItem(
+            icon: Icons.account_balance_wallet_outlined,
+            label: 'Withdraw Savings',
+            color: const Color(0xFFAD1457),
+            onTap: () => _openOverlay(_OverlayScreen.savingsWithdrawal),
+          ),
+          _buildMoreMenuItem(
+            icon: Icons.tune,
+            label: 'Loan Restructure',
+            color: const Color(0xFF6A1B9A),
+            onTap: () => _openOverlay(_OverlayScreen.restructureRequest),
           ),
           const SizedBox(height: 16),
           const Divider(),

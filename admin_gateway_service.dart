@@ -1,7 +1,7 @@
 // IMFSL Admin Gateway Service
 // ============================
 // Typed wrapper for the `imfsl-admin-gateway` Supabase edge function.
-// 41 actions with RBAC (ADMIN, MANAGER, OFFICER, AUDITOR, TELLER).
+// 47 actions with RBAC (ADMIN, MANAGER, OFFICER, AUDITOR, TELLER).
 //
 // Usage:
 //   final service = AdminGatewayService(client: Supabase.instance.client);
@@ -693,6 +693,106 @@ class AdminGatewayService {
       if (priority != null) 'priority': priority,
     });
     return _asMap(result);
+  }
+
+  // ═══════════════════════════════════════════════════════════════════
+  // SUPPORT TICKETS (Admin)
+  // ═══════════════════════════════════════════════════════════════════
+
+  /// Returns the support ticket queue with filters.
+  Future<Map<String, dynamic>> getSupportQueue({
+    String? status,
+    String? category,
+    String? assignedTo,
+    int limit = 25,
+    int offset = 0,
+  }) async {
+    final result = await _call('support_queue', {
+      if (status != null) 'status': status,
+      if (category != null) 'category': category,
+      if (assignedTo != null) 'assigned_to': assignedTo,
+      'limit': limit,
+      'offset': offset,
+    });
+    return _asMap(result);
+  }
+
+  /// Manages a support ticket: assign, update_status, update_priority, resolve, close.
+  Future<Map<String, dynamic>> manageTicket({
+    required String ticketId,
+    required String action,
+    String? notes,
+    String? priority,
+    String? assignedTo,
+  }) async {
+    final result = await _call('manage_ticket', {
+      'ticket_id': ticketId,
+      'action': action,
+      if (notes != null) 'notes': notes,
+      if (priority != null) 'priority': priority,
+      if (assignedTo != null) 'assigned_to': assignedTo,
+    });
+    return _asMap(result);
+  }
+
+  /// Returns full ticket detail with messages (admin view, no ownership check).
+  Future<Map<String, dynamic>> getTicketDetailAdmin(String ticketId) async {
+    final result = await _call('ticket_detail_admin', {
+      'ticket_id': ticketId,
+    });
+    return _asMap(result);
+  }
+
+  // ═══════════════════════════════════════════════════════════════════
+  // SAVINGS WITHDRAWALS (Admin)
+  // ═══════════════════════════════════════════════════════════════════
+
+  /// Returns pending withdrawal queue with optional status filter.
+  Future<Map<String, dynamic>> getWithdrawalQueue({
+    String? status,
+    int limit = 25,
+    int offset = 0,
+  }) async {
+    final result = await _call('withdrawal_queue', {
+      if (status != null) 'status': status,
+      'limit': limit,
+      'offset': offset,
+    });
+    return _asMap(result);
+  }
+
+  /// Approves or rejects a savings withdrawal request.
+  Future<Map<String, dynamic>> processWithdrawal({
+    required String withdrawalId,
+    required String action,
+    String? reason,
+  }) async {
+    final result = await _call('process_withdrawal', {
+      'withdrawal_id': withdrawalId,
+      'action': action,
+      if (reason != null) 'reason': reason,
+    });
+    return _asMap(result);
+  }
+
+  // ═══════════════════════════════════════════════════════════════════
+  // GUARANTOR ADMIN SEARCH
+  // ═══════════════════════════════════════════════════════════════════
+
+  /// Searches guarantors with customer linking status.
+  Future<List<Map<String, dynamic>>> adminGuarantorSearch({
+    String? query,
+    String? linkingStatus,
+    int limit = 25,
+    int offset = 0,
+  }) async {
+    final result = await _call('admin_guarantor_search', {
+      if (query != null && query.isNotEmpty) 'query': query,
+      if (linkingStatus != null) 'linking_status': linkingStatus,
+      'limit': limit,
+      'offset': offset,
+    });
+    return _asList(result);
   }
 
   // ═══════════════════════════════════════════════════════════════════

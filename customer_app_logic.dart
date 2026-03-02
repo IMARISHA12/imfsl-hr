@@ -31,6 +31,10 @@ import 'kyc_onboarding.dart';
 import 'welcome_screen.dart';
 import 'imfsl_payment_center.dart';
 import 'mpesa_payment_widget.dart';
+import 'imfsl_support_tickets.dart';
+import 'imfsl_guarantor_management.dart';
+import 'imfsl_savings_withdrawal.dart';
+import 'imfsl_loan_restructure_request.dart';
 
 class CustomerAppLogic extends StatefulWidget {
   const CustomerAppLogic({
@@ -95,6 +99,24 @@ class _CustomerAppLogicState extends State<CustomerAppLogic> {
   int _paymentCenterRecentTotal = 0;
   bool _isPaymentCenterLoading = false;
   String _paymentCenterFilter = 'ALL';
+
+  // ── Support Tickets ──────────────────────────────────────────────
+  List<Map<String, dynamic>> _supportTickets = [];
+  bool _isSupportLoading = false;
+  String? _ticketStatusFilter;
+
+  // ── Guarantor Management ──────────────────────────────────────────
+  List<Map<String, dynamic>> _guarantorCommitments = [];
+  List<Map<String, dynamic>> _guarantorInvites = [];
+  bool _isGuarantorLoading = false;
+
+  // ── Savings Withdrawal ──────────────────────────────────────────
+  List<Map<String, dynamic>> _savingsWithdrawals = [];
+  bool _isWithdrawalLoading = false;
+
+  // ── Loan Restructure Requests ──────────────────────────────────
+  List<Map<String, dynamic>> _restructureRequests = [];
+  bool _isRestructureLoading = false;
 
   // ── Onboarding state ──────────────────────────────────────────────
   String _onboardingStatus = '';  // NEEDS_KYC, KYC_PENDING, KYC_UNDER_REVIEW, KYC_REJECTED, WELCOME, COMPLETE
@@ -376,23 +398,8 @@ class _CustomerAppLogicState extends State<CustomerAppLogic> {
   }
 
   void _handleWithdraw(Map<String, dynamic> account) {
-    // Withdrawal requires a separate flow (bank transfer, etc.)
-    // Show a placeholder dialog until the withdrawal flow is built
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Withdraw Funds'),
-        content: Text(
-            'Withdrawal from ${account['account_number'] ?? 'savings account'} '
-            'will be processed. Please visit a branch or use the USSD menu.'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('OK'),
-          ),
-        ],
-      ),
-    );
+    // Load withdrawal data lazily, then show withdrawal overlay via home screen
+    _loadWithdrawalData();
   }
 
   // ── Credit score callbacks ─────────────────────────────────────────
@@ -866,6 +873,231 @@ class _CustomerAppLogicState extends State<CustomerAppLogic> {
     ));
   }
 
+  // ── Support Ticket callbacks ──────────────────────────────────────
+
+  Future<void> _loadSupportTickets() async {
+    setState(() => _isSupportLoading = true);
+    try {
+      final tickets = await _service.getMyTickets(
+        status: _ticketStatusFilter,
+        limit: 20,
+      );
+      if (mounted) {
+        setState(() {
+          _supportTickets = tickets;
+          _isSupportLoading = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => _isSupportLoading = false);
+    }
+  }
+
+  void _handleCreateTicket(String category, String subject, String message,
+      String? loanId, String? txnId) async {
+    try {
+      await _service.createSupportTicket(
+        category: category,
+        subject: subject,
+        message: message,
+        loanId: loanId,
+        transactionId: txnId,
+      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Support ticket created successfully')),
+        );
+        _loadSupportTickets();
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: ${_errorMsg(e)}')),
+        );
+      }
+    }
+  }
+
+  void _handleAddTicketMessage(String ticketId, String message) async {
+    try {
+      await _service.addTicketMessage(ticketId: ticketId, message: message);
+      _loadSupportTickets();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: ${_errorMsg(e)}')),
+        );
+      }
+    }
+  }
+
+  Future<Map<String, dynamic>> _handleLoadTicketDetail(String ticketId) async {
+    return _service.getTicketDetail(ticketId);
+  }
+
+  void _handleFilterTicketStatus(String? status) {
+    setState(() => _ticketStatusFilter = status);
+    _loadSupportTickets();
+  }
+
+  // ── Guarantor callbacks ──────────────────────────────────────────
+
+  Future<void> _loadGuarantorData() async {
+    setState(() => _isGuarantorLoading = true);
+    try {
+      final results = await Future.wait([
+        _service.getMyGuarantorCommitments(),
+        _service.getGuarantorInvites(),
+      ]);
+      if (mounted) {
+        setState(() {
+          _guarantorCommitments = results[0];
+          _guarantorInvites = results[1];
+          _isGuarantorLoading = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => _isGuarantorLoading = false);
+    }
+  }
+
+  void _handleGuarantorRespond(String guarantorId, String response) async {
+    try {
+      await _service.respondToGuarantor(
+        guarantorId: guarantorId,
+        response: response,
+      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Guarantor request ${response.toLowerCase()}')),
+        );
+        _loadGuarantorData();
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: ${_errorMsg(e)}')),
+        );
+      }
+    }
+  }
+
+  void _handleGuarantorLink(String guarantorId) async {
+    try {
+      await _service.linkGuarantor(guarantorId);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Guarantor record linked to your account')),
+        );
+        _loadGuarantorData();
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: ${_errorMsg(e)}')),
+        );
+      }
+    }
+  }
+
+  // ── Savings Withdrawal callbacks ──────────────────────────────────
+
+  Future<void> _loadWithdrawalData() async {
+    setState(() => _isWithdrawalLoading = true);
+    try {
+      final withdrawals = await _service.getMyWithdrawals(limit: 20);
+      if (mounted) {
+        setState(() {
+          _savingsWithdrawals = withdrawals;
+          _isWithdrawalLoading = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => _isWithdrawalLoading = false);
+    }
+  }
+
+  void _handleRequestWithdrawal(String accountId, double amount,
+      String channel, String? phone) async {
+    try {
+      await _service.requestSavingsWithdrawal(
+        savingsAccountId: accountId,
+        amount: amount,
+        channel: channel,
+        destinationPhone: phone,
+      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Withdrawal request submitted')),
+        );
+        _loadWithdrawalData();
+        _refreshSavings(); // Refresh available balance
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: ${_errorMsg(e)}')),
+        );
+      }
+    }
+  }
+
+  void _handleWithdrawalLoadMore() async {
+    try {
+      final more = await _service.getMyWithdrawals(
+        limit: 20,
+        offset: _savingsWithdrawals.length,
+      );
+      if (mounted && more.isNotEmpty) {
+        setState(() {
+          _savingsWithdrawals = [..._savingsWithdrawals, ...more];
+        });
+      }
+    } catch (_) {}
+  }
+
+  // ── Loan Restructure callbacks ──────────────────────────────────
+
+  Future<void> _loadRestructureData() async {
+    setState(() => _isRestructureLoading = true);
+    try {
+      final requests = await _service.getMyRestructureRequests(limit: 20);
+      if (mounted) {
+        setState(() {
+          _restructureRequests = requests;
+          _isRestructureLoading = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => _isRestructureLoading = false);
+    }
+  }
+
+  void _handleRequestRestructure(String loanId, String type,
+      String reason, int? requestedTerm) async {
+    try {
+      await _service.requestRestructure(
+        loanId: loanId,
+        type: type,
+        reason: reason,
+        requestedTerm: requestedTerm,
+      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+              content: Text('Restructure request submitted for approval')),
+        );
+        _loadRestructureData();
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: ${_errorMsg(e)}')),
+        );
+      }
+    }
+  }
+
   // ── Upcoming Payments & Payment History callbacks ────────────────
 
   Future<void> _refreshUpcomingPayments() async {
@@ -1121,6 +1353,44 @@ class _CustomerAppLogicState extends State<CustomerAppLogic> {
       onPaymentCenterInitiatePayment: _handlePaymentCenterInitiatePayment,
       // ── Savings Summary ──
       savingsSummary: _savingsSummary,
+      // ── Support Tickets ──
+      supportTickets: _supportTickets,
+      isSupportLoading: _isSupportLoading,
+      onCreateTicket: _handleCreateTicket,
+      onAddTicketMessage: _handleAddTicketMessage,
+      onLoadTicketDetail: _handleLoadTicketDetail,
+      onRefreshTickets: _loadSupportTickets,
+      onLoadMoreTickets: () async {
+        try {
+          final more = await _service.getMyTickets(
+            status: _ticketStatusFilter,
+            limit: 20,
+            offset: _supportTickets.length,
+          );
+          if (mounted && more.isNotEmpty) {
+            setState(() => _supportTickets = [..._supportTickets, ...more]);
+          }
+        } catch (_) {}
+      },
+      onFilterTicketStatus: _handleFilterTicketStatus,
+      // ── Guarantor Management ──
+      guarantorCommitments: _guarantorCommitments,
+      guarantorInvites: _guarantorInvites,
+      isGuarantorLoading: _isGuarantorLoading,
+      onGuarantorRespond: _handleGuarantorRespond,
+      onGuarantorLink: _handleGuarantorLink,
+      onRefreshGuarantors: _loadGuarantorData,
+      // ── Savings Withdrawal ──
+      savingsWithdrawals: _savingsWithdrawals,
+      isWithdrawalLoading: _isWithdrawalLoading,
+      onRequestWithdrawal: _handleRequestWithdrawal,
+      onRefreshWithdrawals: _loadWithdrawalData,
+      onLoadMoreWithdrawals: _handleWithdrawalLoadMore,
+      // ── Loan Restructure ──
+      restructureRequests: _restructureRequests,
+      isRestructureLoading: _isRestructureLoading,
+      onRequestRestructure: _handleRequestRestructure,
+      onRefreshRestructures: _loadRestructureData,
       // ── Terminal callbacks ──
       onLogout: _handleLogout,
       onViewAllTransactions: _handleViewAllTransactions,

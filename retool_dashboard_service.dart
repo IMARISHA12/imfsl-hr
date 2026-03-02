@@ -401,4 +401,44 @@ class RetoolDashboardService {
         .order('config_section')
         .order('item_key');
   }
+
+  // ═══════════════════════════════════════════════════════════════════
+  // SUPPORT TICKET QUEUE (direct table query)
+  // ═══════════════════════════════════════════════════════════════════
+
+  Future<List<Map<String, dynamic>>> getSupportTicketQueue({
+    String? status,
+    String? category,
+    int limit = 25,
+    int offset = 0,
+  }) async {
+    var query = _client.from('imfsl_support_tickets').select();
+    if (status != null && status.isNotEmpty) {
+      query = query.eq('status', status);
+    }
+    if (category != null && category.isNotEmpty) {
+      query = query.eq('category', category);
+    }
+    return await query
+        .order('created_at', ascending: false)
+        .range(offset, offset + limit - 1);
+  }
+
+  // ═══════════════════════════════════════════════════════════════════
+  // SAVINGS WITHDRAWAL QUEUE (direct table query)
+  // ═══════════════════════════════════════════════════════════════════
+
+  Future<List<Map<String, dynamic>>> getSavingsWithdrawalQueue({
+    String? status,
+    int limit = 25,
+    int offset = 0,
+  }) async {
+    var query = _client.from('imfsl_savings_withdrawals').select();
+    if (status != null && status.isNotEmpty) {
+      query = query.eq('status', status);
+    }
+    return await query
+        .order('created_at', ascending: false)
+        .range(offset, offset + limit - 1);
+  }
 }
